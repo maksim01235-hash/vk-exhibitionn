@@ -5,13 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Выставка</title>
   <link rel="stylesheet" href="styles/main.css">
-    <!-- VK Mini Apps Init -->
-  <script>
-    // Инициализация VK Bridge
-    if (window.vkBridge) {
-      vkBridge.send('VKWebAppInit', {});
-    }
-  </script>
 </head>
 <body>
   <div id="app">
@@ -86,13 +79,5 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script type="module" src="src/app.js"></script>
-    <script>
-    // Сообщаем VK, что приложение готово
-    setTimeout(function() {
-      if (window.vkBridge) {
-        vkBridge.send('VKWebAppResizeWindow', {});
-      }
-    }, 500);
-  </script>
 </body>
 </html>
