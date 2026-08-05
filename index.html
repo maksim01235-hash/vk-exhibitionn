@@ -78,6 +78,28 @@
   <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    (function waitForVK(callback) {
+      if (window.vkBridge) {
+        callback();
+      } else {
+        var checkInterval = setInterval(function() {
+          if (window.vkBridge) {
+            clearInterval(checkInterval);
+            callback();
+          }
+        }, 100);
+      }
+    })(function() {
+      vkBridge.send('VKWebAppInit', {})
+        .then(function() {
+          console.log('VK Bridge инициализирован');
+        })
+        .catch(function(e) {
+          console.log('VK Bridge ошибка:', e);
+        });
+    });
+  </script>
   <script type="module" src="src/app.js"></script>
 </body>
 </html>
