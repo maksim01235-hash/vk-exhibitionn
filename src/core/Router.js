@@ -3,6 +3,7 @@ import EventBus from './EventBus.js';
 class Router {
   constructor() {
     this._currentScreen = null;
+    this._hashChecked = false;
   }
 
   async init() {
@@ -18,6 +19,7 @@ class Router {
         if (launchParams && launchParams.vk_connect_args) {
           const id = this._extractPhotoId(launchParams.vk_connect_args);
           if (id) {
+            this._hashChecked = true;
             EventBus.emit('router:openPhoto', id);
             return;
           }
@@ -27,15 +29,22 @@ class Router {
       console.log('VK Bridge не ответил:', e.message);
     }
 
-    // 2. Проверяем хеш сейчас
-    this._checkHash();
+    // 2. Проверяем хеш несколько раз с нарастающей задержкой
+    const delays = [100, 500, 1000, 2000, 3000];
+    delays.forEach(delay => {
+      setTimeout(() => {
+        if (!this._hashChecked) {
+          this._checkHash();
+        }
+      }, delay);
+    });
 
-    // 3. Проверяем хеш ещё раз с задержкой (VK может обрезать и восстановить)
-    setTimeout(() => this._checkHash(), 500);
-    setTimeout(() => this._checkHash(), 1500);
-
-    // 4. Слушаем изменения хеша
-    window.addEventListener('hashchange', () => this._checkHash());
+    // 3. Слушаем изменения хеша
+    window.addEventListener('hashchange', () => {
+      if (!this._hashChecked) {
+        this._checkHash();
+      }
+    });
   }
 
   _checkHash() {
@@ -46,8 +55,8 @@ class Router {
       const id = this._extractPhotoId(hash.substring(1));
       console.log('Router: ID =', id);
       if (id) {
+        this._hashChecked = true;
         EventBus.emit('router:openPhoto', id);
-        return;
       }
     }
   }
