@@ -1,6 +1,5 @@
 import CONFIG from '../config.js';
 import Store from '../core/Store.js';
-import EventBus from '../core/EventBus.js'; // исправлено: путь относительно app.js
 
 class DataLayer {
   constructor() {

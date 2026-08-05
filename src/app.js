@@ -2,25 +2,19 @@ import CONFIG from './config.js';
 import DataLayer from './data/DataLayer.js';
 import Router from './core/Router.js';
 import UIManager from './ui/UIManager.js';
-import EventBus from './core/EventBus.js';
 
-// Точка входа в приложение
+const APP_VERSION = '1.0.1';
+
 async function init() {
-  console.log('Выставка: инициализация...');
+  console.log(`Выставка v${APP_VERSION}: инициализация...`);
 
-  // Инициализируем UI
   UIManager.init();
-
-  // Загружаем данные
   await DataLayer.load();
-
-  // Запускаем роутер
   await Router.init();
 
-  console.log('Выставка: готово');
+  console.log(`Выставка v${APP_VERSION}: готово`);
 }
 
-// Запуск после загрузки страницы
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {

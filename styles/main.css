@@ -45,8 +45,8 @@ html, body {
   background: var(--bg-primary);
 }
 
-.screen.hidden {
-    display: none !important;
+.hidden {
+  display: none !important;
 }
 
 /* Загрузка */
@@ -61,7 +61,7 @@ html, body {
   z-index: 1000;
 }
 .loading-overlay.hidden {
-    display: none !important;
+  display: none;
 }
 .loading-spinner {
   width: 32px;
@@ -118,17 +118,25 @@ html, body {
   flex: 1;
   align-content: start;
 }
+
 .gallery-card {
   cursor: pointer;
   position: relative;
-  overflow: hidden;
   background: var(--bg-secondary);
-  aspect-ratio: 1;
+  overflow: hidden;
+  /* Квадрат через padding */
+  height: 0;
+  padding-bottom: 100%;
 }
+
 .gallery-card-image {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
 }
+
 .gallery-card-image img {
   width: 100%;
   height: 100%;
@@ -136,9 +144,11 @@ html, body {
   display: block;
   transition: transform 0.3s;
 }
+
 .gallery-card:active .gallery-card-image img {
   transform: scale(1.03);
 }
+
 .gallery-card-info {
   position: absolute;
   bottom: 0;
@@ -147,7 +157,9 @@ html, body {
   padding: 8px 10px;
   background: linear-gradient(transparent, rgba(0,0,0,0.6));
   color: #fff;
+  z-index: 1;
 }
+
 .gallery-card-title {
   font-size: 13px;
   font-weight: 500;
@@ -155,10 +167,62 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .gallery-card-author {
   font-size: 11px;
   opacity: 0.8;
   margin-top: 2px;
+}
+
+/* На широких экранах */
+@media (min-width: 500px) {
+  .gallery-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 700px) {
+  .gallery-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* На широких экранах */
+@media (min-width: 500px) {
+  .gallery-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 700px) {
+  .gallery-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* На широких экранах */
+@media (min-width: 500px) {
+  .gallery-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 700px) {
+  .gallery-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Пустое состояние */
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.empty-state.hidden {
+  display: none !important;
 }
 
 /* Экран фото */
@@ -337,14 +401,12 @@ html, body {
   margin: 8px 0;
 }
 
-/* Пустое состояние */
-.empty-state {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-}
-.empty-state.hidden {
-  display: none !important;
+/* Адаптация под ПК */
+@media (min-width: 500px) {
+  .photo-image-wrapper {
+    max-height: 65%;
+  }
+  .photo-title {
+    font-size: 28px;
+  }
 }

@@ -27,6 +27,11 @@ class PhotoView {
     const total = Store.getCount();
     this._counterEl.textContent = `${idx} из ${total}`;
 
+    // Обновляем хеш в URL
+    if (window.location.hash !== `#${photo.id}`) {
+      history.replaceState(null, '', `#${photo.id}`);
+    }
+
     // Панель информации
     if (!this._infoPanel) {
       this._infoPanel = new InfoPanel();
@@ -57,7 +62,6 @@ class PhotoView {
     const currentIdx = Store.getCurrentIndex();
     const urls = [];
 
-    // Предзагружаем 2 следующих и 2 предыдущих
     for (let i = 1; i <= 2; i++) {
       const nextIdx = (currentIdx + i) % allPhotos.length;
       const prevIdx = (currentIdx - i + allPhotos.length) % allPhotos.length;

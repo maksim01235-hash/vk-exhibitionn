@@ -11,6 +11,9 @@ class EventBus {
       this._listeners[event] = [];
     }
     this._listeners[event].push(callback);
+
+    // Возвращаем функцию отписки
+    return () => this.off(event, callback);
   }
 
   off(event, callback) {

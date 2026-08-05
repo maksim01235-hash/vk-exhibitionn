@@ -16,6 +16,7 @@ class UIManager {
     this._qrScanner = null;
     this._currentScreen = 'gallery';
     this._initialized = false;
+    this._pendingPhotoId = null;
   }
 
   init() {
@@ -26,19 +27,37 @@ class UIManager {
 
     // Подписываемся на события
     EventBus.on('router:openGallery', () => this.showGallery());
-    EventBus.on('router:openPhoto', (id) => this.showPhoto(id));
+    
+    EventBus.on('router:openPhoto', (id) => {
+      // Если данные ещё не загружены — запоминаем id и ждём
+      if (Store.getCount() === 0) {
+        this._pendingPhotoId = id;
+      } else {
+        this._pendingPhotoId = null;
+        this.showPhoto(id);
+      }
+    });
+    
     EventBus.on('router:openQR', () => this.showQR());
 
-    // Когда данные загружены — показываем галерею
+    // Когда данные загружены
     EventBus.on('photos:loaded', () => {
       this._hideLoading();
+      
+      // Если был отложенный переход к фото
+      if (this._pendingPhotoId) {
+        const id = this._pendingPhotoId;
+        this._pendingPhotoId = null;
+        this.showPhoto(id);
+        return;
+      }
+      
       if (!this._initialized) {
         this._initialized = true;
         this.showGallery();
       }
     });
     
-    // При ошибке тоже скрываем загрузку и показываем пустую галерею
     EventBus.on('photos:error', () => {
       this._hideLoading();
       if (!this._initialized) {
@@ -60,6 +79,12 @@ class UIManager {
     this._photoScreen.classList.add('hidden');
     this._qrScreen.classList.add('hidden');
     this._qrScanner.stop();
+    
+    // Очищаем хеш
+    if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname);
+    }
+    
     this._galleryView.render();
   }
 
