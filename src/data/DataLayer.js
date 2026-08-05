@@ -43,6 +43,9 @@ class DataLayer {
     const headers = rows[0].map(h => h.trim());
     const photos = [];
 
+    // Поля, которые не являются техпараметрами
+    const baseFields = ['id', 'order', 'title', 'photographer', 'description', 'funFact', 'imageUrl', 'category'];
+
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       const photo = {};
@@ -51,13 +54,13 @@ class DataLayer {
         photo[header] = index < row.length ? row[index].trim() : '';
       });
 
+      // Все не-базовые поля → техпараметры
       photo.techInfo = {};
-      if (photo.camera) photo.techInfo.camera = photo.camera;
-      if (photo.lens) photo.techInfo.lens = photo.lens;
-      if (photo.iso) photo.techInfo.iso = photo.iso;
-      if (photo.aperture) photo.techInfo.aperture = photo.aperture;
-      if (photo.shutterSpeed) photo.techInfo.shutterSpeed = photo.shutterSpeed;
-      if (photo.focalLength) photo.techInfo.focalLength = photo.focalLength;
+      headers.forEach((header) => {
+        if (!baseFields.includes(header) && photo[header]) {
+          photo.techInfo[header] = photo[header];
+        }
+      });
 
       if (photo.id) photos.push(photo);
     }

@@ -6,34 +6,20 @@ class InfoPanel {
   }
 
   render(photo) {
-    const techParams = [];
-    if (photo.techInfo) {
-      if (photo.techInfo.camera) techParams.push({ label: 'Камера', value: photo.techInfo.camera });
-      if (photo.techInfo.lens) techParams.push({ label: 'Объектив', value: photo.techInfo.lens });
-      if (photo.techInfo.iso) techParams.push({ label: 'ISO', value: photo.techInfo.iso });
-      if (photo.techInfo.aperture) techParams.push({ label: 'Диафрагма', value: photo.techInfo.aperture });
-      if (photo.techInfo.shutterSpeed) techParams.push({ label: 'Выдержка', value: photo.techInfo.shutterSpeed });
-      if (photo.techInfo.focalLength) techParams.push({ label: 'Фокусное расстояние', value: photo.techInfo.focalLength });
-    }
-
     let html = '';
 
-    // Название
     if (photo.title) {
       html += `<h2 class="photo-title">${renderMarkdown(photo.title)}</h2>`;
     }
 
-    // Автор
     if (photo.photographer) {
       html += `<div class="photo-photographer">${renderMarkdown(photo.photographer)}</div>`;
     }
 
-    // Описание
     if (photo.description) {
       html += `<div class="photo-description">${renderMarkdown(photo.description)}</div>`;
     }
 
-    // Интересный факт
     if (photo.funFact) {
       html += `
         <div class="photo-funfact">
@@ -43,16 +29,17 @@ class InfoPanel {
       `;
     }
 
-    // Технические параметры
-    if (techParams.length > 0) {
+    // Техпараметры — автоматически из techInfo
+    const techKeys = Object.keys(photo.techInfo || {});
+    if (techKeys.length > 0) {
       html += `
         <div class="photo-techinfo">
           <h3>Технические параметры</h3>
           <table class="tech-table">
-            ${techParams.map(p => `
+            ${techKeys.map(key => `
               <tr>
-                <td class="tech-label">${p.label}</td>
-                <td class="tech-value">${p.value}</td>
+                <td class="tech-label">${this._formatLabel(key)}</td>
+                <td class="tech-value">${photo.techInfo[key]}</td>
               </tr>
             `).join('')}
           </table>
@@ -61,6 +48,22 @@ class InfoPanel {
     }
 
     this._container.innerHTML = html;
+  }
+
+  _formatLabel(key) {
+    // camelCase → читаемый вид
+    const labels = {
+      'camera': 'Камера',
+      'lens': 'Объектив',
+      'iso': 'ISO',
+      'aperture': 'Диафрагма',
+      'shutterSpeed': 'Выдержка',
+      'focalLength': 'Фокусное расстояние',
+      'exposure': 'Экспозиция',
+      'flash': 'Вспышка',
+      'whiteBalance': 'Баланс белого',
+    };
+    return labels[key] || key.charAt(0).toUpperCase() + key.slice(1);
   }
 }
 
