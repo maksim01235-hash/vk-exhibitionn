@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Выставка</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Главный экран: каталог -->
+    <div id="gallery-screen" class="screen">
+      <div class="toolbar">
+        <h1 class="toolbar-title">Выставка</h1>
+        <button id="scan-btn-gallery" class="icon-btn scan-btn" title="Сканер QR-кода">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="8" y1="8" x2="8" y2="8.01"/><line x1="16" y1="8" x2="16" y2="8.01"/>
+            <line x1="8" y1="16" x2="8" y2="16.01"/><line x1="16" y1="16" x2="16" y2="16.01"/>
+            <line x1="12" y1="8" x2="12" y2="16"/>
+          </svg>
+        </button>
+      </div>
+      <div id="gallery-grid" class="gallery-grid"></div>
+      <div id="gallery-empty" class="empty-state hidden">
+        <p>Фотографии не найдены</p>
+      </div>
+    </div>
+
+    <!-- Экран фотографии -->
+    <div id="photo-screen" class="screen hidden">
+      <div class="photo-container">
+        <div id="photo-image-wrapper" class="photo-image-wrapper">
+          <img id="photo-image" src="" alt="" />
+        </div>
+        <div id="photo-info" class="photo-info">
+          <div id="info-content"></div>
+        </div>
+      </div>
+      <div class="photo-toolbar">
+        <button id="back-to-gallery-btn" class="icon-btn" title="В каталог">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+          </svg>
+        </button>
+        <span id="photo-counter" class="photo-counter"></span>
+        <button id="scan-btn-photo" class="icon-btn scan-btn" title="Сканер QR-кода">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="8" y1="8" x2="8" y2="8.01"/><line x1="16" y1="8" x2="16" y2="8.01"/>
+            <line x1="8" y1="16" x2="8" y2="16.01"/><line x1="16" y1="16" x2="16" y2="16.01"/>
+            <line x1="12" y1="8" x2="12" y2="16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Экран сканера QR -->
+    <div id="qr-screen" class="screen hidden">
+      <div class="qr-header">
+        <button id="close-qr-btn" class="icon-btn" title="Закрыть">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <h2>Наведите на QR-код</h2>
+      </div>
+      <div id="qr-reader" class="qr-reader"></div>
+    </div>
+
+    <!-- Индикатор загрузки -->
+    <div id="loading" class="loading-overlay">
+      <div class="loading-spinner"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
