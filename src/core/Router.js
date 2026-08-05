@@ -24,10 +24,21 @@ class Router {
         }
       }
     } catch (e) {
-      console.log('VK Bridge не ответил (локально нормально):', e.message);
+      console.log('VK Bridge не ответил:', e.message);
     }
 
-    // 2. Проверяем хеш в URL
+    // 2. Проверяем хеш сейчас
+    this._checkHash();
+
+    // 3. Проверяем хеш ещё раз с задержкой (VK может обрезать и восстановить)
+    setTimeout(() => this._checkHash(), 500);
+    setTimeout(() => this._checkHash(), 1500);
+
+    // 4. Слушаем изменения хеша
+    window.addEventListener('hashchange', () => this._checkHash());
+  }
+
+  _checkHash() {
     const hash = window.location.hash;
     console.log('Router: хеш =', hash);
     
@@ -39,24 +50,6 @@ class Router {
         return;
       }
     }
-
-    // 3. Главный экран
-    EventBus.emit('router:openGallery');
-
-    // 4. Слушаем изменения хеша
-    window.addEventListener('hashchange', () => {
-      const newHash = window.location.hash;
-      console.log('Router: hash изменился на', newHash);
-      
-      if (newHash && newHash.length > 1) {
-        const id = this._extractPhotoId(newHash.substring(1));
-        if (id) {
-          EventBus.emit('router:openPhoto', id);
-        }
-      } else {
-        EventBus.emit('router:openGallery');
-      }
-    });
   }
 
   _withTimeout(promise, ms) {
