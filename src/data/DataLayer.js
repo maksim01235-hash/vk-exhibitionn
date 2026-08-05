@@ -8,14 +8,11 @@ class DataLayer {
 
   async load() {
     try {
-      // Всегда грузим свежие данные из таблицы
       const photos = await this._fetchFromSheet();
       Store.setPhotos(photos);
-      // Сохраняем в кеш как резервную копию
       this._saveBackup(photos);
     } catch (error) {
       console.log('Ошибка загрузки, пробуем резервную копию:', error.message);
-      // Если не удалось — достаём последнюю удачную копию
       const backup = this._getBackup();
       if (backup) {
         Store.setPhotos(backup);
@@ -29,7 +26,11 @@ class DataLayer {
     const response = await fetch(CONFIG.SHEET_URL);
     if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
     const csvText = await response.text();
-    return this._parseCSV(csvText);
+    console.log('CSV первые 500 символов:', csvText.substring(0, 500));
+    const photos = this._parseCSV(csvText);
+    console.log('Распаршено фото:', photos.length);
+    photos.forEach(p => console.log('  id:', p.id, '| title:', p.title?.substring(0, 30)));
+    return photos;
   }
 
   _parseCSV(csvText) {
@@ -43,7 +44,6 @@ class DataLayer {
     const headers = rows[0].map(h => h.trim());
     const photos = [];
 
-    // Поля, которые не являются техпараметрами
     const baseFields = ['id', 'order', 'title', 'photographer', 'description', 'funFact', 'imageUrl', 'category'];
 
     for (let i = 1; i < rows.length; i++) {
@@ -54,7 +54,6 @@ class DataLayer {
         photo[header] = index < row.length ? row[index].trim() : '';
       });
 
-      // Все не-базовые поля → техпараметры
       photo.techInfo = {};
       headers.forEach((header) => {
         if (!baseFields.includes(header) && photo[header]) {
@@ -62,7 +61,9 @@ class DataLayer {
         }
       });
 
-      if (photo.id) photos.push(photo);
+      if (photo.id && (photo.title || photo.imageUrl)) {
+        photos.push(photo);
+      }
     }
 
     photos.sort((a, b) => {
@@ -82,7 +83,7 @@ class DataLayer {
       const char = line[i];
       
       if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
+        if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
           current += '"';
           i++;
         } else {
