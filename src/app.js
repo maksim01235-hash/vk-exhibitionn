@@ -8,14 +8,33 @@ import EventBus from './core/EventBus.js';
 async function init() {
   console.log('Выставка: инициализация...');
 
-  // Инициализируем UI (создаём компоненты, вешаем обработчики)
+  // Инициализируем VK Bridge
+  if (window.vkBridge) {
+    try {
+      await vkBridge.send('VKWebAppInit', {});
+      console.log('VK Bridge инициализирован');
+    } catch (e) {
+      console.log('VK Bridge не доступен:', e);
+    }
+  }
+
+  // Инициализируем UI
   UIManager.init();
 
   // Загружаем данные
   await DataLayer.load();
 
-  // Запускаем роутер (проверяет deep-link от QR)
+  // Запускаем роутер
   await Router.init();
+
+  // Сообщаем VK, что приложение готово
+  if (window.vkBridge) {
+    try {
+      await vkBridge.send('VKWebAppResizeWindow', {});
+    } catch (e) {
+      console.log('Resize window error:', e);
+    }
+  }
 
   console.log('Выставка: готово');
 }
