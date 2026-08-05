@@ -3,56 +3,42 @@ import Store from '../core/Store.js';
 
 class DataLayer {
   constructor() {
-    this._cacheKey = 'vk_exhibition_data';
-    this._cacheTimeKey = 'vk_exhibition_cache_time';
+    this._cacheKey = 'vk_exhibition_data_backup';
   }
 
-  // Загрузка данных
   async load() {
-    // Проверяем кеш
-    const cached = this._getFromCache();
-    if (cached) {
-      Store.setPhotos(cached);
-      return;
-    }
-
-    // Загружаем из Google Sheets
     try {
+      // Всегда грузим свежие данные из таблицы
       const photos = await this._fetchFromSheet();
-      this._saveToCache(photos);
       Store.setPhotos(photos);
+      // Сохраняем в кеш как резервную копию
+      this._saveBackup(photos);
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
-      // Пробуем отдать устаревший кеш
-      const staleCache = this._getFromCache(true);
-      if (staleCache) {
-        Store.setPhotos(staleCache);
+      console.log('Ошибка загрузки, пробуем резервную копию:', error.message);
+      // Если не удалось — достаём последнюю удачную копию
+      const backup = this._getBackup();
+      if (backup) {
+        Store.setPhotos(backup);
       } else {
-        Store.setError(error.message || 'Не удалось загрузить данные');
+        Store.setError('Не удалось загрузить данные');
       }
     }
   }
 
-  // Загрузка из Google Sheets (CSV)
   async _fetchFromSheet() {
     const response = await fetch(CONFIG.SHEET_URL);
-    if (!response.ok) {
-      throw new Error(`Ошибка HTTP: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
     const csvText = await response.text();
     return this._parseCSV(csvText);
   }
 
-  // Парсинг CSV
   _parseCSV(csvText) {
     const rows = csvText
       .split('\n')
       .map(row => this._parseCSVRow(row))
       .filter(row => row.length > 0);
 
-    if (rows.length < 2) {
-      return [];
-    }
+    if (rows.length < 2) return [];
 
     const headers = rows[0].map(h => h.trim());
     const photos = [];
@@ -61,25 +47,21 @@ class DataLayer {
       const row = rows[i];
       const photo = {};
       
-      // Собираем объект фото из строки
       headers.forEach((header, index) => {
         photo[header] = index < row.length ? row[index].trim() : '';
       });
 
-      // Тех.параметры собираем в отдельный объект для удобства
       photo.techInfo = {};
       if (photo.camera) photo.techInfo.camera = photo.camera;
       if (photo.lens) photo.techInfo.lens = photo.lens;
       if (photo.iso) photo.techInfo.iso = photo.iso;
-      // Можно добавить любые другие параметры — aperture, shutterSpeed, focalLength и т.д.
-      // они автоматически попадут в photo и photo.techInfo если добавить столбцы в таблицу
+      if (photo.aperture) photo.techInfo.aperture = photo.aperture;
+      if (photo.shutterSpeed) photo.techInfo.shutterSpeed = photo.shutterSpeed;
+      if (photo.focalLength) photo.techInfo.focalLength = photo.focalLength;
 
-      if (photo.id) {
-        photos.push(photo);
-      }
+      if (photo.id) photos.push(photo);
     }
 
-    // Сортируем по полю order, если есть, иначе по id
     photos.sort((a, b) => {
       if (a.order && b.order) return Number(a.order) - Number(b.order);
       return Number(a.id) - Number(b.id);
@@ -88,7 +70,6 @@ class DataLayer {
     return photos;
   }
 
-  // Парсинг одной строки CSV (учитывает кавычки)
   _parseCSVRow(line) {
     const result = [];
     let current = '';
@@ -115,30 +96,16 @@ class DataLayer {
     return result;
   }
 
-  // Сохранение в кеш
-  _saveToCache(photos) {
+  _saveBackup(photos) {
     try {
       localStorage.setItem(this._cacheKey, JSON.stringify(photos));
-      localStorage.setItem(this._cacheTimeKey, Date.now().toString());
-    } catch (e) {
-      console.warn('Не удалось сохранить кеш:', e);
-    }
+    } catch (e) {}
   }
 
-  // Чтение из кеша
-  _getFromCache(ignoreExpiry = false) {
+  _getBackup() {
     try {
-      const cached = localStorage.getItem(this._cacheKey);
-      const cacheTime = localStorage.getItem(this._cacheTimeKey);
-      
-      if (!cached || !cacheTime) return null;
-      
-      if (!ignoreExpiry) {
-        const age = (Date.now() - Number(cacheTime)) / 1000 / 60; // минуты
-        if (age > CONFIG.CACHE_TTL) return null;
-      }
-      
-      return JSON.parse(cached);
+      const raw = localStorage.getItem(this._cacheKey);
+      return raw ? JSON.parse(raw) : null;
     } catch (e) {
       return null;
     }
