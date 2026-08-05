@@ -2,12 +2,11 @@ import EventBus from './EventBus.js';
 
 class Router {
   constructor() {
-    this._currentScreen = null;
     this._done = false;
   }
 
   async init() {
-    // 1. Пробуем VK Bridge
+    // 1. VK Bridge
     try {
       if (window.vkBridge) {
         const launchParams = await this._withTimeout(
@@ -18,32 +17,18 @@ class Router {
         
         if (launchParams && launchParams.vk_connect_args) {
           const id = this._extractPhotoId(launchParams.vk_connect_args);
-          if (id) {
-            this._openPhoto(id);
-            return;
-          }
+          if (id) { this._openPhoto(id); return; }
         }
       }
     } catch (e) {
-      console.log('VK Bridge не ответил:', e.message);
+      console.log('VK Bridge:', e.message);
     }
 
-    // 2. Проверяем query-параметр ?photo=
-    const params = new URLSearchParams(window.location.search);
-    const photoParam = params.get('photo');
-    console.log('Router: ?photo =', photoParam);
-    
-    if (photoParam) {
-      this._openPhoto(photoParam);
-      return;
-    }
-
-    // 3. Проверяем хеш (на случай, если сработает)
+    // 2. Проверяем хеш
     this._checkHash();
-    setTimeout(() => this._checkHash(), 500);
-    setTimeout(() => this._checkHash(), 1500);
+    setTimeout(() => this._checkHash(), 300);
+    setTimeout(() => this._checkHash(), 800);
     
-    // 4. Слушаем хеш
     window.addEventListener('hashchange', () => this._checkHash());
   }
 
@@ -61,37 +46,26 @@ class Router {
     
     if (hash && hash.length > 1) {
       const id = this._extractPhotoId(hash.substring(1));
-      if (id) {
-        this._openPhoto(id);
-      }
+      if (id) this._openPhoto(id);
     }
   }
 
   _withTimeout(promise, ms) {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Timeout')), ms);
-      promise
-        .then(result => { clearTimeout(timer); resolve(result); })
-        .catch(err => { clearTimeout(timer); reject(err); });
+      promise.then(r => { clearTimeout(timer); resolve(r); })
+             .catch(e => { clearTimeout(timer); reject(e); });
     });
   }
 
   _extractPhotoId(data) {
     if (!data) return null;
     if (/^\d+$/.test(data.trim())) return data.trim();
-    
     try {
       const json = JSON.parse(data);
       if (json.photoId) return String(json.photoId);
       if (json.id) return String(json.id);
     } catch (e) {}
-    
-    try {
-      const url = new URL(data);
-      const id = url.searchParams.get('photo') || url.searchParams.get('id');
-      if (id) return id;
-    } catch (e) {}
-    
     return null;
   }
 }

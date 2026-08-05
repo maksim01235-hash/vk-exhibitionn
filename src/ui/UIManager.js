@@ -20,16 +20,13 @@ class UIManager {
   }
 
   init() {
-    // Инициализируем компоненты
     this._galleryView = new GalleryView();
     this._photoView = new PhotoView();
     this._qrScanner = new QRScanner();
 
-    // Подписываемся на события
     EventBus.on('router:openGallery', () => this.showGallery());
     
     EventBus.on('router:openPhoto', (id) => {
-      // Если данные ещё не загружены — запоминаем id и ждём
       if (Store.getCount() === 0) {
         this._pendingPhotoId = id;
       } else {
@@ -40,11 +37,9 @@ class UIManager {
     
     EventBus.on('router:openQR', () => this.showQR());
 
-    // Когда данные загружены
     EventBus.on('photos:loaded', () => {
       this._hideLoading();
       
-      // Если был отложенный переход к фото
       if (this._pendingPhotoId) {
         const id = this._pendingPhotoId;
         this._pendingPhotoId = null;
@@ -66,7 +61,6 @@ class UIManager {
       }
     });
 
-    // Кнопки
     document.getElementById('scan-btn-gallery').addEventListener('click', () => this.showQR());
     document.getElementById('scan-btn-photo').addEventListener('click', () => this.showQR());
     document.getElementById('back-to-gallery-btn').addEventListener('click', () => this.showGallery());
@@ -89,9 +83,7 @@ class UIManager {
     this._qrScreen.classList.add('hidden');
     this._qrScanner.stop();
     
-    if (id) {
-      Store.navigateToId(id);
-    }
+    if (id) Store.navigateToId(id);
     this._photoView.render();
   }
 
@@ -104,9 +96,7 @@ class UIManager {
   }
 
   _goBack() {
-    if (this._currentScreen === 'qr') {
-      this.showGallery();
-    } else if (this._currentScreen === 'photo') {
+    if (this._currentScreen === 'qr' || this._currentScreen === 'photo') {
       this.showGallery();
     }
   }

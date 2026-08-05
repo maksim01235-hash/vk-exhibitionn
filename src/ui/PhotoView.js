@@ -16,44 +16,33 @@ class PhotoView {
     const photo = Store.getCurrentPhoto();
     if (!photo) return;
 
-    // Изображение
     const url = photo.imageUrl || 'assets/placeholder.jpg';
     if (this._imageEl.src !== url) {
       this._imageEl.src = url;
     }
 
-    // Счётчик
     const idx = Store.getCurrentIndex() + 1;
     const total = Store.getCount();
     this._counterEl.textContent = `${idx} из ${total}`;
 
-    // Обновляем query-параметр в URL
-    const newUrl = `?photo=${photo.id}`;
-    if (window.location.search !== newUrl) {
-      history.replaceState(null, '', newUrl);
+    // Обновляем хеш
+    const newHash = `#${photo.id}`;
+    if (window.location.hash !== newHash) {
+      history.replaceState(null, '', `/#${photo.id}`);
     }
 
-    // Панель информации
     if (!this._infoPanel) {
       this._infoPanel = new InfoPanel();
     }
     this._infoPanel.render(photo);
 
-    // Предзагружаем соседние изображения
     this._preloadNeighbors();
 
-    // Свайпы
     if (!this._swipeManager) {
       this._swipeManager = new SwipeManager(
         document.getElementById('photo-screen'),
-        () => {
-          Store.next();
-          this.render();
-        },
-        () => {
-          Store.prev();
-          this.render();
-        }
+        () => { Store.next(); this.render(); },
+        () => { Store.prev(); this.render(); }
       );
     }
   }
@@ -67,12 +56,8 @@ class PhotoView {
       const nextIdx = (currentIdx + i) % allPhotos.length;
       const prevIdx = (currentIdx - i + allPhotos.length) % allPhotos.length;
       
-      if (allPhotos[nextIdx] && allPhotos[nextIdx].imageUrl) {
-        urls.push(allPhotos[nextIdx].imageUrl);
-      }
-      if (allPhotos[prevIdx] && allPhotos[prevIdx].imageUrl) {
-        urls.push(allPhotos[prevIdx].imageUrl);
-      }
+      if (allPhotos[nextIdx]?.imageUrl) urls.push(allPhotos[nextIdx].imageUrl);
+      if (allPhotos[prevIdx]?.imageUrl) urls.push(allPhotos[prevIdx].imageUrl);
     }
 
     ImagePreloader.preloadAll(urls);
