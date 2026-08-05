@@ -27,9 +27,10 @@ class PhotoView {
     const total = Store.getCount();
     this._counterEl.textContent = `${idx} из ${total}`;
 
-    // Обновляем хеш в URL
-    if (window.location.hash !== `#${photo.id}`) {
-      history.replaceState(null, '', `#${photo.id}`);
+    // Обновляем query-параметр в URL
+    const newUrl = `?photo=${photo.id}`;
+    if (window.location.search !== newUrl) {
+      history.replaceState(null, '', newUrl);
     }
 
     // Панель информации

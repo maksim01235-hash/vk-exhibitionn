@@ -79,12 +79,6 @@ class UIManager {
     this._photoScreen.classList.add('hidden');
     this._qrScreen.classList.add('hidden');
     this._qrScanner.stop();
-    
-    // Очищаем хеш
-    if (window.location.hash) {
-      history.replaceState(null, '', window.location.pathname);
-    }
-    
     this._galleryView.render();
   }
 
