@@ -34,20 +34,18 @@ class DataLayer {
   }
 
   _parseCSV(csvText) {
-    const rows = csvText
-      .split('\n')
-      .map(row => this._parseCSVRow(row))
-      .filter(row => row.length > 0);
+    const lines = this._splitCSVLines(csvText);
+    if (lines.length < 2) return [];
 
-    if (rows.length < 2) return [];
-
-    const headers = rows[0].map(h => h.trim());
+    const headers = this._parseCSVRow(lines[0]).map(h => h.trim());
     const photos = [];
 
     const baseFields = ['id', 'order', 'title', 'photographer', 'description', 'funFact', 'imageUrl', 'category'];
 
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
+    for (let i = 1; i < lines.length; i++) {
+      const row = this._parseCSVRow(lines[i]);
+      if (row.length === 0) continue;
+
       const photo = {};
       
       headers.forEach((header, index) => {
@@ -72,6 +70,37 @@ class DataLayer {
     });
 
     return photos;
+  }
+
+  _splitCSVLines(text) {
+    const lines = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        current += char;
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (char === '\r' && i + 1 < text.length && text[i + 1] === '\n') {
+          i++;
+        }
+        if (current.trim().length > 0) {
+          lines.push(current);
+        }
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    if (current.trim().length > 0) {
+      lines.push(current);
+    }
+
+    return lines;
   }
 
   _parseCSVRow(line) {
