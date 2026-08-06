@@ -135,6 +135,9 @@ class UIManager {
     const fb = document.getElementById('feedback-btn');
     if (fb) fb.classList.add('hidden');
     
+    // Запоминаем, откуда пришли
+    this._screenBeforeFeedback = this._currentScreen;
+    
     this._galleryScreen.classList.add('hidden');
     this._photoScreen.classList.add('hidden');
     this._qrScreen.classList.add('hidden');
@@ -179,11 +182,7 @@ class UIManager {
       document.getElementById('app').appendChild(feedbackScreen);
       
       document.getElementById('close-feedback-btn').addEventListener('click', () => {
-        feedbackScreen.classList.add('hidden');
-        const fb2 = document.getElementById('feedback-btn');
-        if (fb2) fb2.classList.remove('hidden');
-        this._resetFeedbackForm();
-        this.showGallery();
+        this._closeFeedback();
       });
 
       document.getElementById('feedback-form').addEventListener('submit', (e) => {
@@ -194,6 +193,28 @@ class UIManager {
     
     this._resetFeedbackForm();
     feedbackScreen.classList.remove('hidden');
+  }
+
+  _closeFeedback() {
+    const feedbackScreen = document.getElementById('feedback-screen');
+    if (feedbackScreen) {
+      feedbackScreen.classList.add('hidden');
+    }
+    const fb = document.getElementById('feedback-btn');
+    if (fb) fb.classList.remove('hidden');
+    
+    // Возвращаемся туда, откуда пришли
+    if (this._screenBeforeFeedback === 'photo') {
+      this._currentScreen = 'photo';
+      this._galleryScreen.classList.add('hidden');
+      this._photoScreen.classList.remove('hidden');
+      this._qrScreen.classList.add('hidden');
+      const fbBtn = document.getElementById('feedback-btn');
+      if (fbBtn) fbBtn.classList.add('shifted');
+      // Не дёргаем render — всё уже отрендерено
+    } else {
+      this.showGallery();
+    }
   }
 
   _sendFeedback() {
