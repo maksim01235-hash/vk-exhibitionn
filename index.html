@@ -12,12 +12,7 @@
     <div id="gallery-screen" class="screen">
       <div class="toolbar">
         <button id="scan-btn-gallery" class="icon-btn scan-btn" title="Сканер QR-кода">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="8" y1="8" x2="8" y2="8.01"/><line x1="16" y1="8" x2="16" y2="8.01"/>
-            <line x1="8" y1="16" x2="8" y2="16.01"/><line x1="16" y1="16" x2="16" y2="16.01"/>
-            <line x1="12" y1="8" x2="12" y2="16"/>
-          </svg>
+          <i data-lucide="qr-code"></i>
         </button>
         <h1 class="toolbar-title">Выставка</h1>
         <div style="width:40px"></div>
@@ -46,12 +41,7 @@
           </svg>
         </button>
         <button id="scan-btn-photo" class="icon-btn scan-btn" title="Сканер QR-кода">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="8" y1="8" x2="8" y2="8.01"/><line x1="16" y1="8" x2="16" y2="8.01"/>
-            <line x1="8" y1="16" x2="8" y2="16.01"/><line x1="16" y1="16" x2="16" y2="16.01"/>
-            <line x1="12" y1="8" x2="12" y2="16"/>
-          </svg>
+          <i data-lucide="qr-code"></i>
         </button>
         <span id="photo-counter" class="photo-counter"></span>
       </div>
@@ -109,6 +99,14 @@
         });
     });
   </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script type="module" src="src/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    });
+  </script>
 </body>
 </html>

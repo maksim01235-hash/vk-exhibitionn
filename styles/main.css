@@ -560,3 +560,8 @@ html, body {
 .photo-original-link a:active {
   color: var(--text-primary);
 }
+
+.scan-btn svg {
+  width: 36px;
+  height: 36px;
+}
