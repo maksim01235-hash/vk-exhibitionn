@@ -23,14 +23,24 @@
       </div>
     </div>
 
-    <!-- Экран фотографии -->
+    <!-- Экран фотографии (слайдер) -->
     <div id="photo-screen" class="screen hidden">
-      <div class="photo-container">
-        <div id="photo-image-wrapper" class="photo-image-wrapper">
-          <img id="photo-image" src="" alt="" />
+      <div class="slides-track">
+        <div class="slide slide-left">
+          <div class="slide-content"></div>
         </div>
-        <div id="photo-info" class="photo-info">
-          <div id="info-content"></div>
+        <div class="slide slide-center">
+          <div class="slide-content">
+            <div class="photo-image-wrapper">
+              <img id="photo-image" src="" alt="" />
+            </div>
+            <div class="photo-info">
+              <div id="info-content"></div>
+            </div>
+          </div>
+        </div>
+        <div class="slide slide-right">
+          <div class="slide-content"></div>
         </div>
       </div>
       <div class="photo-toolbar">
