@@ -260,23 +260,27 @@ html, body {
   position: relative;
   overflow: hidden;
   transition: height 0.5s ease;
-  /* Высота задаётся JS */
 }
-#photo-image,
-#photo-image-next {
+.photo-image-wrapper.loading-full::after {
+  content: '';
   position: absolute;
-  top: 0; left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  transition: opacity 0.5s ease;
+  bottom: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  z-index: 3;
 }
 #photo-image {
-  z-index: 1;
-}
-#photo-image-next {
-  z-index: 2;
-  opacity: 0;
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 55vh;
+  object-fit: contain;
+  transition: opacity 0.4s ease;
 }
 
 /* Текст — сразу за фото, без лишних отступов сверху */
@@ -358,6 +362,33 @@ html, body {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
+}
+
+/* Индикатор загрузки full */
+.photo-loading {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  transition: opacity 0.3s;
+}
+.photo-loading.hidden {
+  display: none;
+}
+.photo-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
 }
 
 /* Ссылка на оригинал */

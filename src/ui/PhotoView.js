@@ -7,7 +7,6 @@ import FeedbackPrompt from '../utils/FeedbackPrompt.js';
 class PhotoView {
   constructor() {
     this._imageEl = document.getElementById('photo-image');
-    this._imageNextEl = document.getElementById('photo-image-next');
     this._counterEl = document.getElementById('photo-counter');
     this._imageWrapper = document.getElementById('photo-image-wrapper');
     this._swipeManager = null;
@@ -15,7 +14,7 @@ class PhotoView {
     this._currentPhotoId = null;
     this._preloadQueue = [];
     this._preloadTimer = null;
-    this._activeLayer = 'image';
+    this._fullLoaded = false;
   }
 
   render(direction) {
@@ -27,16 +26,16 @@ class PhotoView {
 
     const previewUrl = photo.imagePreviewUrl || photo.imageUrl;
     const fullUrl = photo.imageUrl || previewUrl;
+    const hasPreview = previewUrl !== fullUrl;
 
     if (direction && oldPhotoId !== photo.id) {
       this._animateSwipe(direction, () => {
-        this._showPhoto(previewUrl, fullUrl);
+        this._showPhoto(previewUrl, fullUrl, hasPreview);
       });
     } else {
-      this._showPhoto(previewUrl, fullUrl);
+      this._showPhoto(previewUrl, fullUrl, hasPreview);
     }
 
-    // Перестраиваем очередь под новое текущее фото
     this._buildNeighborsQueue();
     this._processQueue();
 
@@ -63,58 +62,69 @@ class PhotoView {
     }
   }
 
-  _showPhoto(previewUrl, fullUrl) {
-    const showLayer = this._activeLayer === 'image' ? this._imageNextEl : this._imageEl;
-    const hideLayer = this._activeLayer === 'image' ? this._imageEl : this._imageNextEl;
+  _showPhoto(previewUrl, fullUrl, hasPreview) {
+    this._fullLoaded = false;
 
-    const fitWrapper = (img) => {
-      if (!img.naturalWidth || !img.naturalHeight) {
+    const fitWrapper = (naturalWidth, naturalHeight) => {
+      if (!naturalWidth || !naturalHeight) {
         this._imageWrapper.style.height = 'auto';
         return;
       }
       const wrapperWidth = this._imageWrapper.clientWidth;
-      const ratio = img.naturalHeight / img.naturalWidth;
-      const naturalHeight = wrapperWidth * ratio;
+      const ratio = naturalHeight / naturalWidth;
+      const naturalHeightPx = wrapperWidth * ratio;
       const maxHeight = window.innerHeight * 0.55;
-      this._imageWrapper.style.height = Math.min(naturalHeight, maxHeight) + 'px';
+      this._imageWrapper.style.height = Math.min(naturalHeightPx, maxHeight) + 'px';
     };
 
-    showLayer.src = previewUrl;
-    
-    const showPreview = () => {
-      fitWrapper(showLayer);
-      showLayer.style.opacity = '1';
-      hideLayer.style.opacity = '0';
-      this._activeLayer = this._activeLayer === 'image' ? 'imageNext' : 'image';
-    };
-
-    if (showLayer.complete && showLayer.naturalWidth > 0) {
-      showPreview();
-    } else {
-      showLayer.onload = showPreview;
-      showLayer.onerror = showPreview;
+    // Показываем индикатор
+    if (hasPreview) {
+      this._imageWrapper.classList.add('loading-full');
     }
 
-    if (fullUrl !== previewUrl) {
+    // Грузим preview
+    this._imageEl.style.opacity = '0';
+    this._imageEl.src = previewUrl;
+
+    const onPreviewLoaded = () => {
+      fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
+      this._imageEl.style.opacity = '1';
+
+      // Если нет превью — всё
+      if (!hasPreview) {
+        this._imageWrapper.classList.remove('loading-full');
+        return;
+      }
+
+      // Грузим full
       ImagePreloader.preload(fullUrl).then(() => {
         if (Store.getCurrentPhoto()?.id !== this._currentPhotoId) return;
         
-        hideLayer.src = fullUrl;
-        
-        const showFull = () => {
-          fitWrapper(hideLayer);
-          hideLayer.style.opacity = '1';
-          showLayer.style.opacity = '0';
-          this._activeLayer = this._activeLayer === 'image' ? 'imageNext' : 'image';
-        };
-
-        if (hideLayer.complete && hideLayer.naturalWidth > 0) {
-          showFull();
-        } else {
-          hideLayer.onload = showFull;
-          hideLayer.onerror = showFull;
-        }
+        this._imageEl.style.opacity = '0';
+        setTimeout(() => {
+          if (Store.getCurrentPhoto()?.id !== this._currentPhotoId) return;
+          this._imageEl.src = fullUrl;
+          this._fullLoaded = true;
+          this._imageWrapper.classList.remove('loading-full');
+          
+          if (this._imageEl.complete) {
+            fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
+            this._imageEl.style.opacity = '1';
+          } else {
+            this._imageEl.onload = () => {
+              fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
+              this._imageEl.style.opacity = '1';
+            };
+          }
+        }, 400);
       });
+    };
+
+    if (this._imageEl.complete && this._imageEl.naturalWidth > 0) {
+      onPreviewLoaded();
+    } else {
+      this._imageEl.onload = onPreviewLoaded;
+      this._imageEl.onerror = onPreviewLoaded;
     }
   }
 
@@ -144,19 +154,16 @@ class PhotoView {
     const currentIdx = Store.getCurrentIndex();
     const total = allPhotos.length;
 
-    // Очищаем старую очередь
     this._clearPreloadQueue();
 
     const urgent = [];
     const deferred = [];
 
-    // Текущее фото: полный размер — СРОЧНО
     const current = allPhotos[currentIdx];
     if (current?.imageUrl && current.imageUrl !== (current.imagePreviewUrl || current.imageUrl)) {
       urgent.push({ url: current.imageUrl });
     }
 
-    // Ближайшие соседи: 1 и 2 в обе стороны
     const closeDistances = [1, -1, 2, -2];
     closeDistances.forEach(d => {
       const idx = (currentIdx + d + total) % total;
@@ -174,7 +181,6 @@ class PhotoView {
       }
     });
 
-    // Дальние соседи: 3-5
     for (let d = 3; d <= 5; d++) {
       [d, -d].forEach(dist => {
         const idx = (currentIdx + dist + total) % total;
@@ -187,9 +193,9 @@ class PhotoView {
         }
       });
     }
+
     this._preloadQueue = [...urgent, ...deferred];
     console.log('Queue: urgent', urgent.length, 'deferred', deferred.length, 'total', this._preloadQueue.length);
-    this._preloadQueue = [...urgent, ...deferred];
   }
 
   _clearPreloadQueue() {
