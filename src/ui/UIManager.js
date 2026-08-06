@@ -81,7 +81,8 @@ class UIManager {
     this._hideFeedbackScreen();
     this._qrScanner.stop();
     this._galleryView.render();
-    document.getElementById('feedback-btn').classList.remove('shifted');
+    const fb = document.getElementById('feedback-btn');
+    if (fb) fb.classList.remove('shifted');
   }
 
   showPhoto(id) {
@@ -91,7 +92,8 @@ class UIManager {
     this._qrScreen.classList.add('hidden');
     this._hideFeedbackScreen();
     this._qrScanner.stop();
-    document.getElementById('feedback-btn').classList.add('shifted');
+    const fb = document.getElementById('feedback-btn');
+    if (fb) fb.classList.add('shifted');
     
     if (id) Store.navigateToId(id);
     this._photoView.render();
@@ -104,7 +106,8 @@ class UIManager {
     this._hideFeedbackScreen();
     this._qrScreen.classList.remove('hidden');
     this._qrScanner.start();
-    document.getElementById('feedback-btn').classList.remove('shifted');
+    const fb = document.getElementById('feedback-btn');
+    if (fb) fb.classList.remove('shifted');
   }
 
   _goBack() {
@@ -118,7 +121,8 @@ class UIManager {
   }
 
   _openFeedback() {
-    document.getElementById('feedback-btn').classList.add('hidden');
+    const fb = document.getElementById('feedback-btn');
+    if (fb) fb.classList.add('hidden');
     
     this._galleryScreen.classList.add('hidden');
     this._photoScreen.classList.add('hidden');
@@ -142,20 +146,97 @@ class UIManager {
           <div style="width:40px"></div>
         </div>
         <div class="feedback-content">
-          <p>Если у вас есть вопросы или предложения, напишите нам:</p>
-          <a href="mailto:your@email.com" class="feedback-link">your@email.com</a>
+          <form id="feedback-form" class="feedback-form">
+            <input type="text" id="feedback-name" class="feedback-input" placeholder="Ваше имя" required />
+            <input type="email" id="feedback-email" class="feedback-input" placeholder="Ваша почта" required />
+            <textarea id="feedback-message" class="feedback-textarea" placeholder="Ваше сообщение..." rows="5" required></textarea>
+            <button type="submit" id="feedback-submit" class="feedback-submit-btn">Отправить</button>
+          </form>
+          <div id="feedback-success" class="feedback-success hidden">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <p>Сообщение отправлено!</p>
+            <p style="font-size:14px;color:var(--text-muted)">Мы ответим вам в ближайшее время</p>
+          </div>
+          <div id="feedback-error" class="feedback-error hidden">
+            <p>Ошибка при отправке. Попробуйте позже.</p>
+          </div>
         </div>
       `;
       document.getElementById('app').appendChild(feedbackScreen);
       
       document.getElementById('close-feedback-btn').addEventListener('click', () => {
         feedbackScreen.classList.add('hidden');
-        document.getElementById('feedback-btn').classList.remove('hidden');
+        const fb2 = document.getElementById('feedback-btn');
+        if (fb2) fb2.classList.remove('hidden');
+        this._resetFeedbackForm();
         this.showGallery();
+      });
+
+      document.getElementById('feedback-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        this._sendFeedback();
       });
     }
     
+    this._resetFeedbackForm();
     feedbackScreen.classList.remove('hidden');
+  }
+
+  _sendFeedback() {
+    const submitBtn = document.getElementById('feedback-submit');
+    const form = document.getElementById('feedback-form');
+    const success = document.getElementById('feedback-success');
+    const error = document.getElementById('feedback-error');
+    
+    const name = document.getElementById('feedback-name').value.trim();
+    const email = document.getElementById('feedback-email').value.trim();
+    const message = document.getElementById('feedback-message').value.trim();
+    
+    if (!name || !email || !message) return;
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Отправка...';
+    
+    const templateParams = {
+      name: name,
+      reply_to: email,
+      message: message,
+      time: new Date().toLocaleString('ru-RU'),
+    };
+    
+    emailjs.send('service_ym4iqcu', 'template_x16we4g', templateParams, 'oRCD9VBQMxpxKkwIm')
+      .then(() => {
+        form.classList.add('hidden');
+        error.classList.add('hidden');
+        success.classList.remove('hidden');
+      })
+      .catch((err) => {
+        console.error('Ошибка отправки:', err);
+        error.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Отправить';
+      });
+  }
+
+  _resetFeedbackForm() {
+    const form = document.getElementById('feedback-form');
+    const success = document.getElementById('feedback-success');
+    const error = document.getElementById('feedback-error');
+    const submitBtn = document.getElementById('feedback-submit');
+    
+    if (form) {
+      form.classList.remove('hidden');
+      form.reset();
+    }
+    if (success) success.classList.add('hidden');
+    if (error) error.classList.add('hidden');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Отправить';
+    }
   }
 
   _hideFeedbackScreen() {
@@ -163,9 +244,9 @@ class UIManager {
     if (feedbackScreen) {
       feedbackScreen.classList.add('hidden');
     }
-    const feedbackBtn = document.getElementById('feedback-btn');
-    if (feedbackBtn) {
-      feedbackBtn.classList.remove('hidden');
+    const fb = document.getElementById('feedback-btn');
+    if (fb) {
+      fb.classList.remove('hidden');
     }
   }
 }
