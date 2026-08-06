@@ -30,15 +30,24 @@ class GalleryView {
       });
     });
 
-    // Предзагружаем превью первых 10 фото
-    const previewUrls = photos.slice(0, 10)
-      .map(p => p.imagePreviewUrl || p.imageUrl)
-      .filter(Boolean);
-    ImagePreloader.preloadAll(previewUrls);
+    // Предзагружаем ВСЕ превью (пачками по 2, задержка 200 мс)
+    const previewUrls = photos.map(p => p.imagePreviewUrl || p.imageUrl).filter(Boolean);
+    this._preloadInBatches(previewUrls, 2, 200);
+  }
+
+  _preloadInBatches(urls, batchSize, delayMs) {
+    let i = 0;
+    const loadBatch = () => {
+      const batch = urls.slice(i, i + batchSize);
+      if (batch.length === 0) return;
+      ImagePreloader.preloadAll(batch);
+      i += batchSize;
+      setTimeout(loadBatch, delayMs);
+    };
+    loadBatch();
   }
 
   _renderCard(photo) {
-    // preview, если нет — full
     const imgSrc = photo.imagePreviewUrl || photo.imageUrl || 'assets/placeholder.jpg';
     return `
       <div class="gallery-card" data-photo-id="${photo.id}">

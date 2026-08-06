@@ -11,51 +11,52 @@ class PhotoView {
     this._swipeManager = null;
     this._infoPanel = null;
     this._currentPhotoId = null;
+    this._preloadQueue = [];
+    this._preloadTimer = null;
   }
 
   render() {
     const photo = Store.getCurrentPhoto();
     if (!photo) return;
 
+    this._clearPreloadQueue();
     this._currentPhotoId = photo.id;
 
-    // Сначала показываем preview (быстро), потом подгружаем full
     const previewUrl = photo.imagePreviewUrl || photo.imageUrl;
     const fullUrl = photo.imageUrl || previewUrl;
-    
-    if (this._imageEl.src !== previewUrl) {
-      this._imageEl.src = previewUrl;
-      
-      // Если preview и full отличаются — подгружаем full в фоне
-      if (previewUrl !== fullUrl) {
-        ImagePreloader.preload(fullUrl).then(() => {
-          // Проверяем, что мы всё ещё на этом же фото
-          if (Store.getCurrentPhoto()?.id === this._currentPhotoId) {
-            this._imageEl.src = fullUrl;
-          }
-        });
-      }
+
+    // 1. Сразу preview
+    this._imageEl.src = previewUrl;
+
+    // 2. Сразу начинаем грузить full, по готовности заменяем
+    if (previewUrl !== fullUrl) {
+      ImagePreloader.preload(fullUrl).then(() => {
+        if (Store.getCurrentPhoto()?.id === this._currentPhotoId) {
+          this._imageEl.src = fullUrl;
+        }
+      });
     }
+
+    // 3. Строим очередь соседей
+    this._buildNeighborsQueue();
+    this._processQueue();
 
     // Счётчик
     const idx = Store.getCurrentIndex() + 1;
     const total = Store.getCount();
     this._counterEl.textContent = `${idx} из ${total}`;
 
-    // Обновляем хеш в URL
+    // Хеш
     const newHash = `#${photo.id}`;
     if (window.location.hash !== newHash) {
       history.replaceState(null, '', `/#${photo.id}`);
     }
 
-    // Панель информации
+    // Инфопанель
     if (!this._infoPanel) {
       this._infoPanel = new InfoPanel();
     }
     this._infoPanel.render(photo);
-
-    // Предзагружаем соседей: сначала preview, потом full
-    this._preloadNeighbors();
 
     // Свайпы
     if (!this._swipeManager) {
@@ -67,31 +68,53 @@ class PhotoView {
     }
   }
 
-  _preloadNeighbors() {
+  _buildNeighborsQueue() {
     const allPhotos = Store.getAllPhotos();
     const currentIdx = Store.getCurrentIndex();
-    
-    const neighborPreviewUrls = [];
-    const neighborFullUrls = [];
+    const total = allPhotos.length;
+    this._preloadQueue = [];
 
-    for (let i = 1; i <= 2; i++) {
-      const nextIdx = (currentIdx + i) % allPhotos.length;
-      const prevIdx = (currentIdx - i + allPhotos.length) % allPhotos.length;
-      
-      [allPhotos[nextIdx], allPhotos[prevIdx]].forEach(p => {
+    for (let distance = 1; distance <= total / 2; distance++) {
+      const nextIdx = (currentIdx + distance) % total;
+      const prevIdx = (currentIdx - distance + total) % total;
+
+      [prevIdx, nextIdx].forEach(idx => {
+        const p = allPhotos[idx];
         if (!p) return;
-        // Превью
-        const previewUrl = p.imagePreviewUrl || p.imageUrl;
-        if (previewUrl) neighborPreviewUrls.push(previewUrl);
-        // Полный размер (если отличается от превью)
-        if (p.imageUrl && p.imageUrl !== previewUrl) {
-          neighborFullUrls.push(p.imageUrl);
+        const pUrl = p.imagePreviewUrl || p.imageUrl;
+        if (pUrl) {
+          this._preloadQueue.push({ url: pUrl });
+        }
+      });
+
+      [prevIdx, nextIdx].forEach(idx => {
+        const p = allPhotos[idx];
+        if (!p) return;
+        const pUrl = p.imagePreviewUrl || p.imageUrl;
+        const fUrl = p.imageUrl;
+        if (fUrl && fUrl !== pUrl) {
+          this._preloadQueue.push({ url: fUrl });
         }
       });
     }
+  }
 
-    // Приоритет: превью соседей сейчас, полные версии — в фоне
-    ImagePreloader.preloadWithPriority(neighborPreviewUrls, neighborFullUrls);
+  _clearPreloadQueue() {
+    this._preloadQueue = [];
+    if (this._preloadTimer) {
+      clearTimeout(this._preloadTimer);
+      this._preloadTimer = null;
+    }
+  }
+
+  _processQueue() {
+    if (this._preloadQueue.length === 0) return;
+
+    const item = this._preloadQueue.shift();
+    
+    ImagePreloader.preload(item.url);
+
+    this._preloadTimer = setTimeout(() => this._processQueue(), 100);
   }
 }
 

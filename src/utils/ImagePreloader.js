@@ -1,12 +1,32 @@
-// Предзагрузчик изображений с поддержкой preview и full
+// Предзагрузчик изображений с отметками о загрузке в localStorage
 
 class ImagePreloader {
   constructor() {
     this._pending = new Map();
     this._loaded = new Set();
+    this._storageKey = 'vk_exhibition_loaded_images';
+    this._loadFromStorage();
   }
 
-  // Предзагрузить одно изображение
+  _loadFromStorage() {
+    try {
+      const raw = localStorage.getItem(this._storageKey);
+      if (raw) {
+        const urls = JSON.parse(raw);
+        urls.forEach(url => this._loaded.add(url));
+      }
+    } catch (e) {}
+  }
+
+  _saveToStorage(url) {
+    try {
+      const urls = Array.from(this._loaded);
+      // Храним последние 200 URL
+      const trimmed = urls.slice(-200);
+      localStorage.setItem(this._storageKey, JSON.stringify(trimmed));
+    } catch (e) {}
+  }
+
   preload(url) {
     if (!url) return Promise.resolve(null);
     if (this._loaded.has(url)) return Promise.resolve(url);
@@ -16,6 +36,7 @@ class ImagePreloader {
       const img = new Image();
       img.onload = () => {
         this._loaded.add(url);
+        this._saveToStorage(url);
         this._pending.delete(url);
         resolve(url);
       };
@@ -30,25 +51,18 @@ class ImagePreloader {
     return promise;
   }
 
-  // Предзагрузить массив изображений
   preloadAll(urls) {
     return Promise.all(urls.filter(Boolean).map(url => this.preload(url)));
   }
 
-  // Предзагрузка с приоритетом: сначала urgent, потом остальные
   async preloadWithPriority(urgentUrls, backgroundUrls = []) {
-    // Срочные — немедленно
     const urgentPromise = this.preloadAll(urgentUrls);
-    
-    // Фоновые — с задержкой, чтобы не мешать текущим
     if (backgroundUrls.length > 0) {
       setTimeout(() => this.preloadAll(backgroundUrls), 500);
     }
-    
     return urgentPromise;
   }
 
-  // Проверить, загружено ли
   isLoaded(url) {
     return this._loaded.has(url);
   }
