@@ -7,6 +7,7 @@ class GalleryView {
   constructor() {
     this._grid = document.getElementById('gallery-grid');
     this._empty = document.getElementById('gallery-empty');
+    this._allPreviewsLoaded = false;
   }
 
   render() {
@@ -30,9 +31,12 @@ class GalleryView {
       });
     });
 
-    // Предзагружаем ВСЕ превью (пачками по 2, задержка 200 мс)
-    const previewUrls = photos.map(p => p.imagePreviewUrl || p.imageUrl).filter(Boolean);
-    this._preloadInBatches(previewUrls, 2, 200);
+    // Предзагружаем все превью только один раз за сессию
+    if (!this._allPreviewsLoaded) {
+      this._allPreviewsLoaded = true;
+      const previewUrls = photos.map(p => p.imagePreviewUrl || p.imageUrl).filter(Boolean);
+      this._preloadInBatches(previewUrls, 2, 200);
+    }
   }
 
   _preloadInBatches(urls, batchSize, delayMs) {
