@@ -8,10 +8,7 @@
  *   - Блока «Технические параметры» (автосбор из techInfo)
  *   - Кнопки «Ссылка на оригинал»
  * 
- * При расширении можно добавить:
- *   - Дату и место съёмки (отдельные поля)
- *   - Сворачиваемые секции (аккордеон)
- *   - Теги / ключевые слова
+ * Поддерживает рендер в произвольный контейнер через renderInto().
  */
 
 import { renderMarkdown } from '../utils/markdown.js';
@@ -45,7 +42,7 @@ const EXCLUDED_TECH_KEYS = ['imagePreviewUrl'];
 
 class InfoPanel {
   constructor() {
-    /** @type {HTMLElement} Контейнер для всей информации */
+    /** @type {HTMLElement} Контейнер по умолчанию */
     this._container = document.getElementById('info-content');
   }
 
@@ -54,14 +51,39 @@ class InfoPanel {
   // ═══════════════════════════════════════
 
   /**
-   * Отрисовать информацию о фотографии.
-   * Вызывается при каждом открытии/свайпе фото.
-   * 
-   * @param {Object} photo — объект фотографии из Store
-   *   { title, photographer, description, funFact, techInfo, originalUrl }
+   * Отрисовать информацию в контейнер по умолчанию (#info-content).
+   * @param {Object} photo
    */
   render(photo) {
-    const html = [
+    if (this._container) {
+      this._container.innerHTML = this._buildHTML(photo);
+    }
+  }
+
+  /**
+   * Отрисовать информацию в произвольный контейнер.
+   * Используется слайдером для рендера в крайние слайды.
+   * 
+   * @param {HTMLElement} container — DOM-элемент для вставки
+   * @param {Object} photo
+   */
+  renderInto(container, photo) {
+    if (!container) return;
+    container.innerHTML = this._buildHTML(photo);
+  }
+
+  // ═══════════════════════════════════════
+  // СБОРКА HTML
+  // ═══════════════════════════════════════
+
+  /**
+   * Построить HTML для фотографии.
+   * @param {Object} photo
+   * @returns {string}
+   */
+  _buildHTML(photo) {
+    if (!photo) return '';
+    return [
       this._renderTitle(photo),
       this._renderPhotographer(photo),
       this._renderDescription(photo),
@@ -69,49 +91,27 @@ class InfoPanel {
       this._renderTechInfo(photo),
       this._renderOriginalLink(photo),
     ].filter(Boolean).join('');
-
-    this._container.innerHTML = html;
   }
 
   // ═══════════════════════════════════════
   // РЕНДЕР СЕКЦИЙ
   // ═══════════════════════════════════════
 
-  /**
-   * Название фотографии (Markdown).
-   * @param {Object} photo
-   * @returns {string}
-   */
   _renderTitle(photo) {
     if (!photo.title) return '';
     return `<h2 class="photo-title">${renderMarkdown(photo.title)}</h2>`;
   }
 
-  /**
-   * Автор (Markdown).
-   * @param {Object} photo
-   * @returns {string}
-   */
   _renderPhotographer(photo) {
     if (!photo.photographer) return '';
     return `<div class="photo-photographer">${renderMarkdown(photo.photographer)}</div>`;
   }
 
-  /**
-   * Описание (Markdown). Поддерживает абзацы, списки, цитаты.
-   * @param {Object} photo
-   * @returns {string}
-   */
   _renderDescription(photo) {
     if (!photo.description) return '';
     return `<div class="photo-description">${renderMarkdown(photo.description)}</div>`;
   }
 
-  /**
-   * Блок «Интересный факт» с заголовком (Markdown).
-   * @param {Object} photo
-   * @returns {string}
-   */
   _renderFunFact(photo) {
     if (!photo.funFact) return '';
     return `
@@ -122,12 +122,6 @@ class InfoPanel {
     `;
   }
 
-  /**
-   * Блок «Технические параметры».
-   * Автоматически собирает все поля из techInfo, кроме URL.
-   * @param {Object} photo
-   * @returns {string}
-   */
   _renderTechInfo(photo) {
     const techInfo = photo.techInfo || {};
     const keys = Object.keys(techInfo).filter(key => {
@@ -154,11 +148,6 @@ class InfoPanel {
     `;
   }
 
-  /**
-   * Кнопка «Ссылка на оригинал» с иконкой внешней ссылки.
-   * @param {Object} photo
-   * @returns {string}
-   */
   _renderOriginalLink(photo) {
     if (!photo.originalUrl) return '';
     return `

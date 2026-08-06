@@ -297,20 +297,37 @@ body {
 }
 
 /* ═══════════════════════════════════════
-   ЭКРАН ФОТО
+   ЭКРАН ФОТО — слайдер
    ═══════════════════════════════════════ */
 
-/* Скролл-контейнер: фото + текст (тулбар отдельно) */
-.photo-container {
+/* Трек слайдов — 3 экрана в ряд, центрирован на среднем */
+.slides-track {
+  display: flex;
+  width: 300vw;
+  transform: translateX(-100vw);
+  will-change: transform;
   flex: 1;
+  overflow: hidden;
+}
+
+/* Один слайд */
+.slide {
+  width: 100vw;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
 }
 
-/* Блок с фото */
-.photo-image-wrapper {
+/* Содержимое слайда */
+.slide-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Блок с фото внутри слайда */
+.slide .photo-image-wrapper {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -321,8 +338,8 @@ body {
   transition: height var(--transition-slow) ease;
 }
 
-/* Индикатор загрузки full (псевдоэлемент) */
-.photo-image-wrapper.loading-full::after {
+/* Индикатор загрузки full */
+.slide .photo-image-wrapper.loading-full::after {
   content: '';
   position: absolute;
   bottom: 8px;
@@ -336,7 +353,7 @@ body {
   z-index: 3;
 }
 
-#photo-image {
+.slide .photo-image-wrapper img {
   display: block;
   width: 100%;
   height: auto;
@@ -345,13 +362,13 @@ body {
   transition: opacity 0.4s ease;
 }
 
-/* Информация */
-.photo-info {
-  flex: 1;
+/* Информация внутри слайда */
+.slide .photo-info {
   padding: 20px 16px 24px;
   transition: padding-top var(--transition-slow) ease;
 }
 
+/* Заголовок, автор, описание, факт, техпараметры, ссылка — без изменений */
 .photo-title {
   font-size: 24px;
   font-weight: 700;
@@ -377,7 +394,6 @@ body {
   margin-bottom: 8px;
 }
 
-/* Интересный факт */
 .photo-funfact {
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
@@ -396,7 +412,6 @@ body {
   line-height: 1.5;
 }
 
-/* Технические параметры */
 .photo-techinfo {
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
@@ -436,7 +451,6 @@ body {
   color: var(--text-primary);
 }
 
-/* Ссылка на оригинал */
 .original-link-btn {
   display: inline-flex;
   align-items: center;
@@ -455,7 +469,7 @@ body {
   background: var(--border-color);
 }
 
-/* Тулбар фото */
+/* Тулбар фото (не часть слайдера, фиксирован снизу) */
 .photo-toolbar {
   display: flex;
   align-items: center;
