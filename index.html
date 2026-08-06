@@ -44,7 +44,6 @@
             <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
           </svg>
         </button>
-        <span id="photo-counter" class="photo-counter"></span>
         <button id="scan-btn-photo" class="icon-btn scan-btn" title="Сканер QR-кода">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -53,6 +52,7 @@
             <line x1="12" y1="8" x2="12" y2="16"/>
           </svg>
         </button>
+        <span id="photo-counter" class="photo-counter"></span>
       </div>
     </div>
 
@@ -68,6 +68,13 @@
       </div>
       <div id="qr-reader" class="qr-reader"></div>
     </div>
+
+    <!-- Кнопка обратной связи -->
+    <button id="feedback-btn" class="feedback-btn" title="Обратная связь">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </button>
 
     <!-- Индикатор загрузки -->
     <div id="loading" class="loading-overlay">
@@ -101,12 +108,5 @@
     });
   </script>
   <script type="module" src="src/app.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('SW зарегистрирован'))
-        .catch(err => console.log('SW ошибка:', err));
-    }
-  </script>
 </body>
 </html>

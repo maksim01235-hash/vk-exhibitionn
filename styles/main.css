@@ -124,7 +124,6 @@ html, body {
   position: relative;
   background: var(--bg-secondary);
   overflow: hidden;
-  /* Квадрат через padding */
   height: 0;
   padding-bottom: 100%;
 }
@@ -167,40 +166,25 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.gallery-card-title p {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .gallery-card-author {
   font-size: 11px;
   opacity: 0.8;
   margin-top: 2px;
 }
-
-/* На широких экранах */
-@media (min-width: 500px) {
-  .gallery-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+.gallery-card-author p {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-@media (min-width: 700px) {
-  .gallery-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-/* На широких экранах */
-@media (min-width: 500px) {
-  .gallery-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (min-width: 700px) {
-  .gallery-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-/* На широких экранах */
 @media (min-width: 500px) {
   .gallery-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -333,8 +317,14 @@ html, body {
   border-top: 1px solid var(--border-color);
   background: var(--bg-primary);
   flex-shrink: 0;
+  position: relative;
 }
+
+/* Счётчик по центру */
 .photo-counter {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 13px;
   color: var(--text-muted);
 }
@@ -409,43 +399,64 @@ html, body {
   .photo-title {
     font-size: 28px;
   }
+}
 
-/* Текстовые блоки */
-.photo-block {
-  margin-bottom: 16px;
+/* Кнопка обратной связи */
+.feedback-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  z-index: 100;
+  transition: transform 0.15s, opacity 0.15s, bottom 0.2s;
 }
-.photo-block-title {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--text-muted);
-  margin-bottom: 8px;
+.feedback-btn:active {
+  transform: scale(0.92);
 }
-.photo-block-content {
+.feedback-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* На экране фото — поднимаем кнопку выше, чтобы не мешала тулбару */
+.feedback-btn.shifted {
+  bottom: 70px;
+}
+
+/* Страница обратной связи */
+.feedback-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
   font-size: 16px;
   line-height: 1.6;
-}
-.photo-block-content p {
-  margin-bottom: 8px;
-}
-.photo-block-content ul,
-.photo-block-content ol {
-  margin: 8px 0;
-  padding-left: 20px;
-}
-.photo-block-content li {
-  margin-bottom: 4px;
-}
-.photo-block-content strong {
-  font-weight: 600;
-}
-.photo-block-content em {
-  font-style: italic;
-}
-.photo-block-content blockquote {
-  border-left: 3px solid var(--border-color);
-  padding-left: 12px;
   color: var(--text-secondary);
-  margin: 8px 0;
 }
+.feedback-link {
+  display: inline-block;
+  margin-top: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  border-bottom: 2px solid var(--text-primary);
+  padding-bottom: 2px;
+  transition: opacity 0.15s;
+}
+.feedback-link:active {
+  opacity: 0.6;
 }

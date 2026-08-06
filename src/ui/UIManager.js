@@ -65,6 +65,12 @@ class UIManager {
     document.getElementById('scan-btn-photo').addEventListener('click', () => this.showQR());
     document.getElementById('back-to-gallery-btn').addEventListener('click', () => this.showGallery());
     document.getElementById('close-qr-btn').addEventListener('click', () => this._goBack());
+
+    // Кнопка обратной связи
+    const feedbackBtn = document.getElementById('feedback-btn');
+    if (feedbackBtn) {
+      feedbackBtn.addEventListener('click', () => this._openFeedback());
+    }
   }
 
   showGallery() {
@@ -72,8 +78,10 @@ class UIManager {
     this._galleryScreen.classList.remove('hidden');
     this._photoScreen.classList.add('hidden');
     this._qrScreen.classList.add('hidden');
+    this._hideFeedbackScreen();
     this._qrScanner.stop();
     this._galleryView.render();
+    document.getElementById('feedback-btn').classList.remove('shifted');
   }
 
   showPhoto(id) {
@@ -81,7 +89,9 @@ class UIManager {
     this._galleryScreen.classList.add('hidden');
     this._photoScreen.classList.remove('hidden');
     this._qrScreen.classList.add('hidden');
+    this._hideFeedbackScreen();
     this._qrScanner.stop();
+    document.getElementById('feedback-btn').classList.add('shifted');
     
     if (id) Store.navigateToId(id);
     this._photoView.render();
@@ -91,8 +101,10 @@ class UIManager {
     this._currentScreen = 'qr';
     this._galleryScreen.classList.add('hidden');
     this._photoScreen.classList.add('hidden');
+    this._hideFeedbackScreen();
     this._qrScreen.classList.remove('hidden');
     this._qrScanner.start();
+    document.getElementById('feedback-btn').classList.remove('shifted');
   }
 
   _goBack() {
@@ -103,6 +115,58 @@ class UIManager {
 
   _hideLoading() {
     this._loading.classList.add('hidden');
+  }
+
+  _openFeedback() {
+    document.getElementById('feedback-btn').classList.add('hidden');
+    
+    this._galleryScreen.classList.add('hidden');
+    this._photoScreen.classList.add('hidden');
+    this._qrScreen.classList.add('hidden');
+    this._qrScanner.stop();
+    this._currentScreen = 'feedback';
+    
+    let feedbackScreen = document.getElementById('feedback-screen');
+    if (!feedbackScreen) {
+      feedbackScreen = document.createElement('div');
+      feedbackScreen.id = 'feedback-screen';
+      feedbackScreen.className = 'screen hidden';
+      feedbackScreen.innerHTML = `
+        <div class="toolbar">
+          <button id="close-feedback-btn" class="icon-btn" title="Назад">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <h1 class="toolbar-title">Обратная связь</h1>
+          <div style="width:40px"></div>
+        </div>
+        <div class="feedback-content">
+          <p>Если у вас есть вопросы или предложения, напишите нам:</p>
+          <a href="mailto:your@email.com" class="feedback-link">your@email.com</a>
+        </div>
+      `;
+      document.getElementById('app').appendChild(feedbackScreen);
+      
+      document.getElementById('close-feedback-btn').addEventListener('click', () => {
+        feedbackScreen.classList.add('hidden');
+        document.getElementById('feedback-btn').classList.remove('hidden');
+        this.showGallery();
+      });
+    }
+    
+    feedbackScreen.classList.remove('hidden');
+  }
+
+  _hideFeedbackScreen() {
+    const feedbackScreen = document.getElementById('feedback-screen');
+    if (feedbackScreen) {
+      feedbackScreen.classList.add('hidden');
+    }
+    const feedbackBtn = document.getElementById('feedback-btn');
+    if (feedbackBtn) {
+      feedbackBtn.classList.remove('hidden');
+    }
   }
 }
 
