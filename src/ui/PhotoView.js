@@ -66,57 +66,69 @@ class PhotoView {
     this._fullLoaded = false;
 
     const fitWrapper = (naturalWidth, naturalHeight) => {
-      if (!naturalWidth || !naturalHeight) {
-        this._imageWrapper.style.height = 'auto';
-        return;
-      }
+      if (!naturalWidth || !naturalHeight) return;
       const wrapperWidth = this._imageWrapper.clientWidth;
       const ratio = naturalHeight / naturalWidth;
-      const naturalHeightPx = wrapperWidth * ratio;
       const maxHeight = window.innerHeight * 0.55;
-      this._imageWrapper.style.height = Math.min(naturalHeightPx, maxHeight) + 'px';
+      const h = Math.min(wrapperWidth * ratio, maxHeight);
+      this._imageWrapper.style.height = h + 'px';
     };
 
-    // Показываем индикатор
-    if (hasPreview) {
+    // Всегда показываем индикатор при загрузке
+    if (!this._fullLoaded) {
       this._imageWrapper.classList.add('loading-full');
     }
 
-    // Грузим preview
     this._imageEl.style.opacity = '0';
     this._imageEl.src = previewUrl;
 
     const onPreviewLoaded = () => {
-      fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
-      this._imageEl.style.opacity = '1';
-
-      // Если нет превью — всё
       if (!hasPreview) {
-        this._imageWrapper.classList.remove('loading-full');
+        if (this._imageEl.complete) {
+          fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
+          this._imageEl.style.opacity = '1';
+          this._imageWrapper.classList.remove('loading-full');
+          this._fullLoaded = true;
+        } else {
+          this._imageEl.onload = () => {
+            fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
+            this._imageEl.style.opacity = '1';
+            this._imageWrapper.classList.remove('loading-full');
+            this._fullLoaded = true;
+          };
+        }
         return;
       }
 
-      // Грузим full
-      ImagePreloader.preload(fullUrl).then(() => {
+      ImagePreloader.preload(fullUrl).then((fullImgUrl) => {
         if (Store.getCurrentPhoto()?.id !== this._currentPhotoId) return;
-        
-        this._imageEl.style.opacity = '0';
-        setTimeout(() => {
+
+        const tmp = new Image();
+        tmp.onload = () => {
           if (Store.getCurrentPhoto()?.id !== this._currentPhotoId) return;
-          this._imageEl.src = fullUrl;
-          this._fullLoaded = true;
-          this._imageWrapper.classList.remove('loading-full');
+          fitWrapper(tmp.naturalWidth, tmp.naturalHeight);
           
-          if (this._imageEl.complete) {
-            fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
-            this._imageEl.style.opacity = '1';
-          } else {
-            this._imageEl.onload = () => {
-              fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
+          this._imageEl.style.opacity = '0';
+          setTimeout(() => {
+            if (Store.getCurrentPhoto()?.id !== this._currentPhotoId) return;
+            this._imageEl.src = fullUrl;
+            this._fullLoaded = true;
+            this._imageWrapper.classList.remove('loading-full');
+            
+            if (this._imageEl.complete) {
               this._imageEl.style.opacity = '1';
-            };
-          }
-        }, 400);
+            } else {
+              this._imageEl.onload = () => { this._imageEl.style.opacity = '1'; };
+            }
+          }, 400);
+        };
+        tmp.onerror = () => {
+          fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
+          this._imageEl.style.opacity = '1';
+          this._imageWrapper.classList.remove('loading-full');
+          this._fullLoaded = true;
+        };
+        tmp.src = fullUrl;
       });
     };
 
