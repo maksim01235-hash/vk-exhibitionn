@@ -29,7 +29,7 @@ class UIManager {
     EventBus.on('router:openPhoto', (id) => {
       if (Store.getCount() === 0) {
         this._pendingPhotoId = id;
-      } else {
+      } else if (!this._initialized || this._currentScreen !== 'photo') {
         this._pendingPhotoId = null;
         this.showPhoto(id);
       }
@@ -43,8 +43,20 @@ class UIManager {
       if (this._pendingPhotoId) {
         const id = this._pendingPhotoId;
         this._pendingPhotoId = null;
+        this._initialized = true;
         this.showPhoto(id);
         return;
+      }
+      
+      // Проверяем хеш напрямую
+      const hash = window.location.hash;
+      if (hash && hash.length > 1) {
+        const id = hash.substring(1).replace(/^\//, '');
+        if (id && Store.navigateToId(id)) {
+          this._initialized = true;
+          this.showPhoto(id);
+          return;
+        }
       }
       
       if (!this._initialized) {
@@ -66,7 +78,6 @@ class UIManager {
     document.getElementById('back-to-gallery-btn').addEventListener('click', () => this.showGallery());
     document.getElementById('close-qr-btn').addEventListener('click', () => this._goBack());
 
-    // Кнопка обратной связи
     const feedbackBtn = document.getElementById('feedback-btn');
     if (feedbackBtn) {
       feedbackBtn.addEventListener('click', () => this._openFeedback());
