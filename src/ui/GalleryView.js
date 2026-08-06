@@ -30,12 +30,16 @@ class GalleryView {
       });
     });
 
-    const urls = photos.slice(0, 10).map(p => p.imageUrl).filter(Boolean);
-    ImagePreloader.preloadAll(urls);
+    // Предзагружаем превью первых 10 фото
+    const previewUrls = photos.slice(0, 10)
+      .map(p => p.imagePreviewUrl || p.imageUrl)
+      .filter(Boolean);
+    ImagePreloader.preloadAll(previewUrls);
   }
 
   _renderCard(photo) {
-    const imgSrc = photo.imageUrl || 'assets/placeholder.jpg';
+    // preview, если нет — full
+    const imgSrc = photo.imagePreviewUrl || photo.imageUrl || 'assets/placeholder.jpg';
     return `
       <div class="gallery-card" data-photo-id="${photo.id}">
         <div class="gallery-card-image">

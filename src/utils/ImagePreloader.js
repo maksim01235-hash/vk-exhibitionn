@@ -1,21 +1,23 @@
-// Предзагрузчик изображений
-// Загружает изображения в фоне, чтобы они попали в сетевой кеш браузера
+// Предзагрузчик изображений с поддержкой preview и full
 
 class ImagePreloader {
   constructor() {
     this._pending = new Map();
+    this._loaded = new Set();
   }
 
   // Предзагрузить одно изображение
   preload(url) {
     if (!url) return Promise.resolve(null);
+    if (this._loaded.has(url)) return Promise.resolve(url);
     if (this._pending.has(url)) return this._pending.get(url);
 
     const promise = new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
+        this._loaded.add(url);
         this._pending.delete(url);
-        resolve(img);
+        resolve(url);
       };
       img.onerror = () => {
         this._pending.delete(url);
@@ -33,18 +35,22 @@ class ImagePreloader {
     return Promise.all(urls.filter(Boolean).map(url => this.preload(url)));
   }
 
-  // Предзагрузка с приоритетом: сначала первые N, потом остальные
-  async preloadWithPriority(urls, firstN = 10) {
-    const first = urls.slice(0, firstN);
-    const rest = urls.slice(firstN);
+  // Предзагрузка с приоритетом: сначала urgent, потом остальные
+  async preloadWithPriority(urgentUrls, backgroundUrls = []) {
+    // Срочные — немедленно
+    const urgentPromise = this.preloadAll(urgentUrls);
     
-    // Сначала загружаем приоритетные
-    await this.preloadAll(first);
-    
-    // Потом остальные в фоне
-    if (rest.length > 0) {
-      setTimeout(() => this.preloadAll(rest), 100);
+    // Фоновые — с задержкой, чтобы не мешать текущим
+    if (backgroundUrls.length > 0) {
+      setTimeout(() => this.preloadAll(backgroundUrls), 500);
     }
+    
+    return urgentPromise;
+  }
+
+  // Проверить, загружено ли
+  isLoaded(url) {
+    return this._loaded.has(url);
   }
 }
 
