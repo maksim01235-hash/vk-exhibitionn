@@ -485,7 +485,20 @@ html, body {
 }
 .feedback-btn.shifted { bottom: 60px; }
 
-/* Страница */
+/* Экран */
+#feedback-screen {
+  animation: feedbackSlideUp 0.35s ease forwards;
+}
+@keyframes feedbackSlideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes feedbackSlideDown {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(30px); }
+}
+
+/* Контент */
 .feedback-content {
   flex: 1;
   display: flex;
@@ -498,18 +511,6 @@ html, body {
   line-height: 1.6;
   color: var(--text-secondary);
 }
-.feedback-link {
-  display: inline-block;
-  margin-top: 16px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  text-decoration: none;
-  border-bottom: 2px solid var(--text-primary);
-  padding-bottom: 2px;
-  transition: opacity 0.15s;
-}
-.feedback-link:active { opacity: 0.6; }
 
 /* Форма */
 .feedback-form {
@@ -522,23 +523,33 @@ html, body {
 .feedback-input,
 .feedback-textarea {
   width: 100%;
-  padding: 12px 16px;
+  padding: 14px 16px;
   font-size: 16px;
   font-family: var(--font-sans);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 12px;
   background: var(--bg-secondary);
   color: var(--text-primary);
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.2s, box-shadow 0.2s;
   -webkit-appearance: none;
 }
 .feedback-input:focus,
-.feedback-textarea:focus { border-color: var(--text-primary); }
+.feedback-textarea:focus {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+}
+.feedback-input.error,
+.feedback-textarea.error {
+  border-color: #E53935;
+  box-shadow: 0 0 0 3px rgba(229,57,53,0.1);
+}
 .feedback-textarea {
   resize: vertical;
   min-height: 100px;
 }
+
+/* Кнопка отправки */
 .feedback-submit-btn {
   padding: 14px 24px;
   font-size: 16px;
@@ -547,27 +558,54 @@ html, body {
   background: var(--text-primary);
   color: var(--bg-primary);
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.15s;
+  position: relative;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.feedback-submit-btn:active { opacity: 0.8; }
+.feedback-submit-btn:active {
+  opacity: 0.8;
+  transform: scale(0.98);
+}
 .feedback-submit-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
+/* Спинер в кнопке */
+.feedback-submit-btn .btn-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--bg-primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  position: absolute;
+}
+.feedback-submit-btn .btn-text.hidden {
+  visibility: hidden;
+}
+
+/* Успех и ошибка */
 .feedback-success {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
   color: var(--text-primary);
+  animation: feedbackSlideUp 0.3s ease forwards;
 }
 .feedback-success svg { color: #4CAF50; }
 .feedback-error {
   color: #E53935;
   text-align: center;
+  font-size: 14px;
+  margin-top: 8px;
+  animation: feedbackSlideUp 0.3s ease forwards;
 }
 .feedback-success.hidden,
 .feedback-error.hidden { display: none; }
