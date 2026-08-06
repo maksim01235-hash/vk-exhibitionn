@@ -1,4 +1,7 @@
-/* Сброс стилей и базовые настройки */
+/* ═══════════════════════════════════════
+   СБРОС И БАЗОВЫЕ НАСТРОЙКИ
+   ═══════════════════════════════════════ */
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -33,7 +36,14 @@ html, body {
   position: relative;
 }
 
-/* Экран */
+.hidden {
+  display: none !important;
+}
+
+/* ═══════════════════════════════════════
+   ЭКРАНЫ — общие
+   ═══════════════════════════════════════ */
+
 .screen {
   position: absolute;
   top: 0;
@@ -45,25 +55,10 @@ html, body {
   background: var(--bg-primary);
 }
 
-/* Главный экран */
-#gallery-screen {
-  position: relative;
-}
+/* ═══════════════════════════════════════
+   ЗАГРУЗКА
+   ═══════════════════════════════════════ */
 
-#gallery-screen .toolbar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
-  height: 56px;
-}
-
-.hidden {
-  display: none !important;
-}
-
-/* Загрузка */
 .loading-overlay {
   position: fixed;
   top: 0; left: 0;
@@ -74,9 +69,7 @@ html, body {
   justify-content: center;
   z-index: 1000;
 }
-.loading-overlay.hidden {
-  display: none;
-}
+.loading-overlay.hidden { display: none; }
 .loading-spinner {
   width: 32px;
   height: 32px;
@@ -89,7 +82,10 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
-/* Тулбар */
+/* ═══════════════════════════════════════
+   ТУЛБАР
+   ═══════════════════════════════════════ */
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -125,54 +121,48 @@ html, body {
   justify-content: center;
   transition: background 0.15s;
 }
-.icon-btn:active {
-  background: var(--bg-secondary);
-}
-
-/* Все иконки в кнопках */
+.icon-btn:active { background: var(--bg-secondary); }
 .icon-btn svg,
 .icon-btn i {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
 }
 
-/* Галерея */
+/* ═══════════════════════════════════════
+   ГЛАВНЫЙ ЭКРАН — галерея
+   ═══════════════════════════════════════ */
+
+#gallery-screen {
+  position: relative;
+}
+#gallery-screen .toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  z-index: 10;
+}
+
+/* Сетка */
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 4px;
   padding: 4px;
-  padding-top: 60px; /* 56px тулбар + 4px отступ */
+  padding-top: 60px;
   overflow-y: auto;
   flex: 1;
   align-content: start;
 }
-
 @media (min-width: 500px) {
-  .gallery-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+  .gallery-grid { grid-template-columns: repeat(3, 1fr); }
 }
-
 @media (min-width: 700px) {
-  .gallery-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
+  .gallery-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
-/* Контейнер карточки — изначально схлопнут */
-.gallery-card-container {
-  height: 0;
-  padding-bottom: 100%;
-  transition: height 0.3s;
-}
-
-.gallery-card-container:has(.gallery-card.loaded) {
-  height: auto;
-  padding-bottom: 0;
-}
-
-/* Если :has не поддерживается — просто покажем всё */
+/* Карточка */
 .gallery-card {
   cursor: pointer;
   position: relative;
@@ -184,45 +174,34 @@ html, body {
   transition: transform 0.2s, box-shadow 0.2s;
   animation: cardFadeIn 1.5s ease forwards;
 }
-
 @keyframes cardFadeIn {
   from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
 .gallery-card:active {
   transform: scale(0.96);
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
-
 .gallery-card-image {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
   background: #eee;
 }
-
 .gallery-card-image img {
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   object-fit: cover;
   display: block;
 }
-
 .gallery-card-info {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 0; left: 0; right: 0;
   padding: 8px 10px;
   background: linear-gradient(transparent, rgba(0,0,0,0.65));
   color: #fff;
   z-index: 2;
   border-radius: 0 0 6px 6px;
 }
-
 .gallery-card-title {
   font-size: 13px;
   font-weight: 500;
@@ -236,7 +215,6 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .gallery-card-author {
   font-size: 11px;
   opacity: 0.8;
@@ -257,46 +235,63 @@ html, body {
   justify-content: center;
   color: var(--text-muted);
 }
-.empty-state.hidden {
-  display: none !important;
-}
+.empty-state.hidden { display: none !important; }
 
-/* Экран фото */
+/* ═══════════════════════════════════════
+   ЭКРАН ФОТО
+   ═══════════════════════════════════════ */
+
+/* Общий скролл-контейнер: фото + текст + тулбар */
 .photo-container {
   flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
+
+/* Блок с фото — без скролла, подстраивается под высоту изображения */
 .photo-image-wrapper {
   flex-shrink: 0;
-  max-height: 55%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #000;
+  position: relative;
+  overflow: hidden;
+  transition: height 0.5s ease;
+  /* Высота задаётся JS */
 }
-.photo-image-wrapper img {
-  max-width: 100%;
-  max-height: 100%;
+#photo-image,
+#photo-image-next {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  transition: opacity 0.5s ease;
 }
+#photo-image {
+  z-index: 1;
+}
+#photo-image-next {
+  z-index: 2;
+  opacity: 0;
+}
+
+/* Текст — сразу за фото, без лишних отступов сверху */
 .photo-info {
   flex: 1;
-  overflow-y: auto;
   padding: 20px 16px 24px;
-  -webkit-overflow-scrolling: touch;
+  transition: padding-top 0.5s ease;
 }
 .photo-title {
-  font-family: var(--font-serif);
   font-size: 24px;
   font-weight: 700;
   line-height: 1.2;
   margin-bottom: 4px;
 }
-.photo-title p {
-  margin: 0;
-}
+.photo-title p { margin: 0; }
 .photo-photographer {
   font-size: 15px;
   color: var(--text-secondary);
@@ -307,9 +302,9 @@ html, body {
   line-height: 1.6;
   margin-bottom: 16px;
 }
-.photo-description p {
-  margin-bottom: 8px;
-}
+.photo-description p { margin-bottom: 8px; }
+
+/* Интересный факт */
 .photo-funfact {
   background: var(--bg-secondary);
   border-radius: 12px;
@@ -323,11 +318,13 @@ html, body {
   color: var(--text-muted);
   margin-bottom: 8px;
 }
-.funfact-content {
-  font-size: 15px;
-  line-height: 1.5;
-}
+.funfact-content { font-size: 15px; line-height: 1.5; }
+
+/* Технические параметры */
 .photo-techinfo {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 16px;
   margin-bottom: 16px;
 }
 .photo-techinfo h3 {
@@ -335,44 +332,64 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: var(--text-muted);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
-.tech-table {
-  width: 100%;
-  border-collapse: collapse;
+.tech-params {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
-.tech-table tr {
-  border-bottom: 1px solid var(--border-color);
+.tech-param {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
 }
-.tech-table tr:last-child {
+.tech-param:last-child {
+  padding-bottom: 0;
   border-bottom: none;
 }
-.tech-table td {
-  padding: 8px 0;
+.tech-param-label {
   font-size: 14px;
-}
-.tech-label {
   color: var(--text-secondary);
-  width: 40%;
 }
-.tech-value {
-  color: var(--text-primary);
+.tech-param-value {
+  font-size: 14px;
   font-weight: 500;
+  color: var(--text-primary);
 }
 
-/* Тулбар фото */
+/* Ссылка на оригинал */
+.original-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.original-link-btn:active { background: var(--border-color); }
+
+/* Тулбар фото — полупрозрачный */
 .photo-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-primary);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   flex-shrink: 0;
   position: relative;
 }
-
-/* Счётчик по центру */
 .photo-counter {
   position: absolute;
   left: 50%;
@@ -381,7 +398,34 @@ html, body {
   color: var(--text-muted);
 }
 
-/* QR-сканер */
+/* ═══════════════════════════════════════
+   MARKDOWN
+   ═══════════════════════════════════════ */
+
+.photo-description strong,
+.funfact-content strong,
+.photo-photographer strong { font-weight: 600; }
+.photo-description em,
+.funfact-content em { font-style: italic; }
+.photo-description ul, .photo-description ol,
+.funfact-content ul, .funfact-content ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.photo-description li,
+.funfact-content li { margin-bottom: 4px; }
+.photo-description blockquote,
+.funfact-content blockquote {
+  border-left: 3px solid var(--border-color);
+  padding-left: 12px;
+  color: var(--text-secondary);
+  margin: 8px 0;
+}
+
+/* ═══════════════════════════════════════
+   QR-СКАНЕР
+   ═══════════════════════════════════════ */
+
 .qr-header {
   display: flex;
   align-items: center;
@@ -389,10 +433,7 @@ html, body {
   border-bottom: 1px solid var(--border-color);
   gap: 12px;
 }
-.qr-header h2 {
-  font-size: 18px;
-  font-weight: 600;
-}
+.qr-header h2 { font-size: 18px; font-weight: 600; }
 .qr-reader {
   flex: 1;
   overflow: hidden;
@@ -414,46 +455,11 @@ html, body {
   text-align: center;
 }
 
-/* Markdown-стили внутри контента */
-.photo-description strong,
-.funfact-content strong,
-.photo-photographer strong {
-  font-weight: 600;
-}
-.photo-description em,
-.funfact-content em {
-  font-style: italic;
-}
-.photo-description ul,
-.photo-description ol,
-.funfact-content ul,
-.funfact-content ol {
-  margin: 8px 0;
-  padding-left: 20px;
-}
-.photo-description li,
-.funfact-content li {
-  margin-bottom: 4px;
-}
-.photo-description blockquote,
-.funfact-content blockquote {
-  border-left: 3px solid var(--border-color);
-  padding-left: 12px;
-  color: var(--text-secondary);
-  margin: 8px 0;
-}
+/* ═══════════════════════════════════════
+   ОБРАТНАЯ СВЯЗЬ
+   ═══════════════════════════════════════ */
 
-/* Адаптация под ПК */
-@media (min-width: 500px) {
-  .photo-image-wrapper {
-    max-height: 65%;
-  }
-  .photo-title {
-    font-size: 28px;
-  }
-}
-
-/* Кнопка обратной связи */
+/* Кнопка */
 .feedback-btn {
   position: fixed;
   bottom: 20px;
@@ -472,18 +478,14 @@ html, body {
   z-index: 100;
   transition: transform 0.15s, opacity 0.15s, bottom 0.2s;
 }
-.feedback-btn:active {
-  transform: scale(0.92);
-}
+.feedback-btn:active { transform: scale(0.92); }
 .feedback-btn.hidden {
   opacity: 0;
   pointer-events: none;
 }
-.feedback-btn.shifted {
-  bottom: 70px;
-}
+.feedback-btn.shifted { bottom: 70px; }
 
-/* Страница обратной связи */
+/* Страница */
 .feedback-content {
   flex: 1;
   display: flex;
@@ -507,11 +509,9 @@ html, body {
   padding-bottom: 2px;
   transition: opacity 0.15s;
 }
-.feedback-link:active {
-  opacity: 0.6;
-}
+.feedback-link:active { opacity: 0.6; }
 
-/* Форма обратной связи */
+/* Форма */
 .feedback-form {
   width: 100%;
   max-width: 400px;
@@ -519,7 +519,6 @@ html, body {
   flex-direction: column;
   gap: 12px;
 }
-
 .feedback-input,
 .feedback-textarea {
   width: 100%;
@@ -534,17 +533,12 @@ html, body {
   transition: border-color 0.15s;
   -webkit-appearance: none;
 }
-
 .feedback-input:focus,
-.feedback-textarea:focus {
-  border-color: var(--text-primary);
-}
-
+.feedback-textarea:focus { border-color: var(--text-primary); }
 .feedback-textarea {
   resize: vertical;
   min-height: 100px;
 }
-
 .feedback-submit-btn {
   padding: 14px 24px;
   font-size: 16px;
@@ -557,11 +551,7 @@ html, body {
   cursor: pointer;
   transition: opacity 0.15s;
 }
-
-.feedback-submit-btn:active {
-  opacity: 0.8;
-}
-
+.feedback-submit-btn:active { opacity: 0.8; }
 .feedback-submit-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -574,41 +564,15 @@ html, body {
   gap: 12px;
   color: var(--text-primary);
 }
-
-.feedback-success svg {
-  color: #4CAF50;
-}
-
+.feedback-success svg { color: #4CAF50; }
 .feedback-error {
   color: #E53935;
   text-align: center;
 }
-
 .feedback-success.hidden,
-.feedback-error.hidden {
-  display: none;
-}
+.feedback-error.hidden { display: none; }
 
-/* Ссылка на оригинал */
-.photo-original-link {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-color);
-}
-.photo-original-link a {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-.photo-original-link a:active {
-  color: var(--text-primary);
-}
-
-/* Пузырь подсказки обратной связи */
+/* Пузырь */
 .feedback-bubble {
   position: fixed;
   bottom: 133px;
@@ -636,8 +600,7 @@ html, body {
 }
 .feedback-bubble-close {
   position: absolute;
-  top: 6px;
-  right: 8px;
+  top: 6px; right: 8px;
   background: none;
   border: none;
   color: var(--bg-primary);
@@ -647,9 +610,7 @@ html, body {
   padding: 4px 6px;
   line-height: 1;
 }
-.feedback-bubble-close:active {
-  opacity: 1;
-}
+.feedback-bubble-close:active { opacity: 1; }
 .feedback-bubble-tail {
   position: absolute;
   bottom: -8px;
@@ -658,4 +619,13 @@ html, body {
   height: 10px;
   background: var(--text-primary);
   clip-path: polygon(0 0, 100% 0, 70% 100%);
+}
+
+/* ═══════════════════════════════════════
+   АДАПТАЦИЯ ПОД ПК
+   ═══════════════════════════════════════ */
+
+@media (min-width: 500px) {
+  #photo-image { max-height: 65vh; }
+  .photo-title { font-size: 28px; }
 }

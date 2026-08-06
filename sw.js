@@ -1,6 +1,6 @@
-// Service Worker для кеширования приложения
+const CACHE_NAME = 'vk-exhibition-v2';
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
-const CACHE_NAME = 'vk-exhibition-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -19,14 +19,19 @@ const STATIC_ASSETS = [
   '/src/ui/QRScanner.js',
   '/src/utils/markdown.js',
   '/src/utils/ImagePreloader.js',
+  '/src/utils/FeedbackPrompt.js',
   '/assets/placeholder.jpg',
   'https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js',
   'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
   'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js',
+  'https://unpkg.com/lucide@latest',
 ];
 
-// Установка
+function isCacheable(response) {
+  return response && response.ok && response.status === 200;
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -37,7 +42,6 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Активация
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -48,16 +52,9 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Проверка: можно ли кешировать ответ
-function isCacheable(response) {
-  return response && response.ok && response.status === 200;
-}
-
-// Перехват запросов
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Данные таблицы и API: сеть → кеш
   if (url.hostname === 'docs.google.com' || url.hostname === 'api.emailjs.com') {
     event.respondWith(
       fetch(event.request)
@@ -73,36 +70,45 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Всё остальное: кеш → сеть → кеш
+  if (event.request.destination === 'image') {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        
+        return fetch(event.request).then((response) => {
+          if (isCacheable(response)) {
+            const contentLength = response.headers.get('content-length');
+            if (!contentLength || parseInt(contentLength) <= MAX_IMAGE_SIZE) {
+              const cloned = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+            }
+          }
+          return response;
+        }).catch(() => cached || caches.match('/assets/placeholder.jpg'));
+      })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Фоновое обновление кеша
         fetch(event.request)
           .then((response) => {
             if (isCacheable(response)) {
               caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
             }
           })
-          .catch(() => {}); // Молча игнорируем ошибки сети
+          .catch(() => {});
         return cachedResponse;
       }
-
-      return fetch(event.request)
-        .then((response) => {
-          if (isCacheable(response)) {
-            const cloned = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
-          }
-          return response;
-        })
-        .catch((err) => {
-          // Возвращаем заглушку для изображений при ошибке
-          if (event.request.destination === 'image') {
-            return caches.match('/assets/placeholder.jpg');
-          }
-          throw err;
-        });
+      return fetch(event.request).then((response) => {
+        if (isCacheable(response)) {
+          const cloned = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+        }
+        return response;
+      });
     })
   );
 });

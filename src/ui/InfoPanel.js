@@ -37,34 +37,32 @@ class InfoPanel {
       html += `
         <div class="photo-techinfo">
           <h3>Технические параметры</h3>
-          <table class="tech-table">
+          <div class="tech-params">
             ${techKeys.map(key => {
               const label = this._formatLabel(key);
               if (!label) return '';
               return `
-                <tr>
-                  <td class="tech-label">${label}</td>
-                  <td class="tech-value">${photo.techInfo[key]}</td>
-                </tr>
+                <div class="tech-param">
+                  <span class="tech-param-label">${label}</span>
+                  <span class="tech-param-value">${photo.techInfo[key]}</span>
+                </div>
               `;
             }).join('')}
-          </table>
+          </div>
         </div>
       `;
     }
 
     if (photo.originalUrl) {
       html += `
-        <div class="photo-original-link">
-          <a href="${photo.originalUrl}" target="_blank" rel="noopener">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-              <polyline points="15 3 21 3 21 9"/>
-              <line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
-            Ссылка на оригинал
-          </a>
-        </div>
+        <a href="${photo.originalUrl}" target="_blank" rel="noopener" class="original-link-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          Ссылка на оригинал
+        </a>
       `;
     }
 
