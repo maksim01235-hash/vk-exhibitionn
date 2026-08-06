@@ -25,7 +25,6 @@ class GalleryView {
     this._empty.classList.add('hidden');
     this._grid.classList.remove('hidden');
 
-    // Всегда перерисовываем — DOM мог быть очищен
     this._grid.innerHTML = photos.map(photo => this._renderCard(photo)).join('');
 
     this._grid.querySelectorAll('.gallery-card').forEach(card => {
@@ -57,7 +56,7 @@ class GalleryView {
   _renderCard(photo) {
     const imgSrc = photo.imagePreviewUrl || photo.imageUrl || 'assets/placeholder.jpg';
     return `
-      <div class="gallery-card" data-photo-id="${photo.id}">
+      <div class="gallery-card loaded" data-photo-id="${photo.id}">
         <div class="gallery-card-image">
           <img src="${imgSrc}" alt="${this._escape(photo.title || '')}" loading="lazy" />
         </div>

@@ -238,6 +238,8 @@ class FeedbackPrompt {
     this._showing = false;
     this._hideBubble();
   }
+    cancel() {
+    this._cancelAll();
+  }
 }
-
 export default new FeedbackPrompt();

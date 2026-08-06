@@ -3,6 +3,7 @@ import EventBus from '../core/EventBus.js';
 import GalleryView from './GalleryView.js';
 import PhotoView from './PhotoView.js';
 import QRScanner from './QRScanner.js';
+import FeedbackPrompt from '../utils/FeedbackPrompt.js';
 
 class UIManager {
   constructor() {
@@ -94,6 +95,14 @@ class UIManager {
     this._galleryView.render();
     const fb = document.getElementById('feedback-btn');
     if (fb) fb.classList.remove('shifted');
+    
+    // Очищаем хеш
+    if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname);
+    }
+    
+    // Отменяем пузырь
+    FeedbackPrompt.cancel();
   }
 
   showPhoto(id) {

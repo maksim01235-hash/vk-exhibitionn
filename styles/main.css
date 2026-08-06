@@ -45,6 +45,20 @@ html, body {
   background: var(--bg-primary);
 }
 
+/* Главный экран */
+#gallery-screen {
+  position: relative;
+}
+
+#gallery-screen .toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  height: 56px;
+}
+
 .hidden {
   display: none !important;
 }
@@ -81,10 +95,13 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-primary);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   flex-shrink: 0;
   position: relative;
+  z-index: 10;
 }
 .toolbar-title {
   position: absolute;
@@ -112,17 +129,50 @@ html, body {
   background: var(--bg-secondary);
 }
 
+/* Все иконки в кнопках */
+.icon-btn svg,
+.icon-btn i {
+  width: 36px;
+  height: 36px;
+}
+
 /* Галерея */
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 2px;
-  padding: 2px;
+  gap: 4px;
+  padding: 4px;
+  padding-top: 60px; /* 56px тулбар + 4px отступ */
   overflow-y: auto;
   flex: 1;
   align-content: start;
 }
 
+@media (min-width: 500px) {
+  .gallery-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 700px) {
+  .gallery-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Контейнер карточки — изначально схлопнут */
+.gallery-card-container {
+  height: 0;
+  padding-bottom: 100%;
+  transition: height 0.3s;
+}
+
+.gallery-card-container:has(.gallery-card.loaded) {
+  height: auto;
+  padding-bottom: 0;
+}
+
+/* Если :has не поддерживается — просто покажем всё */
 .gallery-card {
   cursor: pointer;
   position: relative;
@@ -130,6 +180,19 @@ html, body {
   overflow: hidden;
   height: 0;
   padding-bottom: 100%;
+  border-radius: 6px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: cardFadeIn 1.5s ease forwards;
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.gallery-card:active {
+  transform: scale(0.96);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .gallery-card-image {
@@ -138,6 +201,7 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
+  background: #eee;
 }
 
 .gallery-card-image img {
@@ -145,11 +209,6 @@ html, body {
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.3s;
-}
-
-.gallery-card:active .gallery-card-image img {
-  transform: scale(1.03);
 }
 
 .gallery-card-info {
@@ -158,9 +217,10 @@ html, body {
   left: 0;
   right: 0;
   padding: 8px 10px;
-  background: linear-gradient(transparent, rgba(0,0,0,0.6));
+  background: linear-gradient(transparent, rgba(0,0,0,0.65));
   color: #fff;
-  z-index: 1;
+  z-index: 2;
+  border-radius: 0 0 6px 6px;
 }
 
 .gallery-card-title {
@@ -187,18 +247,6 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-@media (min-width: 500px) {
-  .gallery-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (min-width: 700px) {
-  .gallery-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 /* Пустое состояние */
@@ -431,8 +479,6 @@ html, body {
   opacity: 0;
   pointer-events: none;
 }
-
-/* На экране фото — поднимаем кнопку выше, чтобы не мешала тулбару */
 .feedback-btn.shifted {
   bottom: 70px;
 }
@@ -542,6 +588,7 @@ html, body {
 .feedback-error.hidden {
   display: none;
 }
+
 /* Ссылка на оригинал */
 .photo-original-link {
   margin-top: 16px;
@@ -559,18 +606,6 @@ html, body {
 }
 .photo-original-link a:active {
   color: var(--text-primary);
-}
-
-.scan-btn svg {
-  width: 36px;
-  height: 36px;
-}
-
-/* Все иконки в кнопках — единый размер */
-.icon-btn svg,
-.icon-btn i {
-  width: 36px;
-  height: 36px;
 }
 
 /* Пузырь подсказки обратной связи */
