@@ -32,7 +32,7 @@ import UIManager from './ui/UIManager.js';
  *   MINOR — новый функционал
  *   PATCH — исправления
  */
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '2.0.2';
 
 /** Путь к файлу Service Worker */
 const SW_PATH = '/sw.js';

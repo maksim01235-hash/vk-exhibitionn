@@ -217,6 +217,15 @@ class UIManager {
     this._photoView.render();
   }
 
+
+  resetSwipe() {
+    this._settling = false;
+    this._resetTrackToCenter();
+    if (this._swipeManager) {
+      this._swipeManager.cancel();
+    }
+  }
+
   /**
    * Показать QR-сканер.
    */

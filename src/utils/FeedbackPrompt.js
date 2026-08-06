@@ -4,22 +4,12 @@
  * Появляется после прочтения описания фото (скролл до конца) или по таймауту,
  * если скроллить нечего. Содержит случайную фразу, при клике открывает
  * форму обратной связи.
- * 
- * Ограничения:
- *   — Не более MAX_PROMPTS показов подряд
- *   — Счётчик сбрасывается после просмотра RESET_AFTER_PHOTOS фото
- *   — Дебаунс между показами SHOW_DEBOUNCE мс
  */
 
 // ═══════════════════════════════════════
 // НАСТРОЙКИ
 // ═══════════════════════════════════════
 
-/**
- * Фразы для пузыря.
- * Чтобы добавить новую — добавь строку в массив.
- * Можно использовать эмодзи: '🌟 Понравилось?'
- */
 const MESSAGES = [
   'Понравилась выставка?',
   'Как вам фотографии?',
@@ -47,7 +37,7 @@ const SCROLL_THRESHOLD = 40;
 /** Автоскрытие пузыря (мс) */
 const AUTO_HIDE_DELAY = 10000;
 
-/** Длительность анимации (мс) — совпадает с CSS */
+/** Длительность анимации (мс) */
 const BUBBLE_ANIMATION = 300;
 
 /** Дебаунс между показами (мс) */
@@ -59,8 +49,6 @@ const SHOW_DEBOUNCE = 500;
 
 const STORAGE_KEY_SHOWN = 'vk_exhibition_prompt_shown';
 const STORAGE_KEY_PHOTO_COUNT = 'vk_exhibition_prompt_photo_count';
-
-// ═══════════════════════════════════════
 
 class FeedbackPrompt {
   constructor() {
@@ -76,10 +64,6 @@ class FeedbackPrompt {
 
     this._loadState();
   }
-
-  // ═══════════════════════════════════════
-  // СОСТОЯНИЕ (localStorage)
-  // ═══════════════════════════════════════
 
   _loadState() {
     try {
@@ -101,19 +85,18 @@ class FeedbackPrompt {
     } catch (e) {}
   }
 
-  // ═══════════════════════════════════════
-  // ПУБЛИЧНЫЙ API
-  // ═══════════════════════════════════════
-
-  /**
-   * Вызывается при открытии фотографии.
-   * @param {string} photoId
-   */
   onPhotoOpened(photoId) {
+    console.log('FP: onPhotoOpened, id=', photoId, 'shown=', this._shown, 'photoCount=', this._photoCount);
+
     this._cancelAll();
 
     const photoScreen = document.getElementById('photo-screen');
-    if (!photoScreen || photoScreen.classList.contains('hidden')) return;
+    console.log('FP: photoScreen hidden?', photoScreen?.classList.contains('hidden'));
+
+    if (!photoScreen || photoScreen.classList.contains('hidden')) {
+      console.log('FP: экран фото скрыт, выход');
+      return;
+    }
 
     if (this._currentPhotoId !== photoId) {
       this._currentPhotoId = photoId;
@@ -127,36 +110,33 @@ class FeedbackPrompt {
       this._saveState();
     }
 
-    if (this._shown >= MAX_PROMPTS) return;
+    if (this._shown >= MAX_PROMPTS) {
+      console.log('FP: лимит показов исчерпан');
+      return;
+    }
 
     this._timer = setTimeout(() => this._checkScroll(), CHECK_DELAY);
   }
 
-  /**
-   * Принудительно скрыть пузырь (с анимацией или мгновенно).
-   * @param {boolean} [instant=false] — мгновенное удаление без анимации
-   */
   cancel(instant = false) {
     this._cancelAll(instant);
   }
-
-  // ═══════════════════════════════════════
-  // ЛОГИКА ПОКАЗА
-  // ═══════════════════════════════════════
 
   _checkScroll() {
     const photoScreen = document.getElementById('photo-screen');
     if (!photoScreen || photoScreen.classList.contains('hidden')) return;
     if (this._showing || this._shown >= MAX_PROMPTS) return;
 
-    const infoEl = document.getElementById('photo-info');
-    if (!infoEl) return;
+    const slideEl = document.querySelector('.slide-center');
+    console.log('FP: _checkScroll, slideEl found?', !!slideEl);
+    if (!slideEl) return;
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (this._showing || this._shown >= MAX_PROMPTS) return;
 
-        const canScroll = infoEl.scrollHeight > infoEl.clientHeight + 10;
+        const canScroll = slideEl.scrollHeight > slideEl.clientHeight + 10;
+        console.log('FP: scrollH', slideEl.scrollHeight, 'clientH', slideEl.clientHeight, 'canScroll', canScroll);
 
         if (this._timer) clearTimeout(this._timer);
         this._timer = null;
@@ -165,10 +145,10 @@ class FeedbackPrompt {
           this._timer = setTimeout(() => this._show(), NO_SCROLL_TIMER);
         } else {
           if (this._scrollHandler) {
-            infoEl.removeEventListener('scroll', this._scrollHandler);
+            slideEl.removeEventListener('scroll', this._scrollHandler);
           }
           this._scrollHandler = () => this._onScroll();
-          infoEl.addEventListener('scroll', this._scrollHandler, { passive: true });
+          slideEl.addEventListener('scroll', this._scrollHandler, { passive: true });
         }
       });
     });
@@ -176,12 +156,15 @@ class FeedbackPrompt {
 
   _onScroll() {
     if (this._showing) return;
-    const infoEl = document.getElementById('photo-info');
-    if (!infoEl) return;
+    const slideEl = document.querySelector('.slide-center');
+    if (!slideEl) return;
 
-    if (infoEl.scrollHeight - infoEl.scrollTop - infoEl.clientHeight <= SCROLL_THRESHOLD) {
+    const distanceToBottom = slideEl.scrollHeight - slideEl.scrollTop - slideEl.clientHeight;
+    console.log('FP: distanceToBottom', distanceToBottom, 'threshold', SCROLL_THRESHOLD);
+
+    if (distanceToBottom <= SCROLL_THRESHOLD) {
       if (this._scrollHandler) {
-        infoEl.removeEventListener('scroll', this._scrollHandler);
+        slideEl.removeEventListener('scroll', this._scrollHandler);
         this._scrollHandler = null;
       }
       if (this._timer) clearTimeout(this._timer);
@@ -205,6 +188,7 @@ class FeedbackPrompt {
     }
 
     const message = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+    console.log('FP: показываем пузырь:', message);
 
     this._hideBubble(true);
 
@@ -226,7 +210,6 @@ class FeedbackPrompt {
       bubble.classList.add('visible');
     });
 
-    // Клик по пузырю → мгновенно скрываем и открываем форму
     bubble.addEventListener('click', (e) => {
       if (!e.target.classList.contains('feedback-bubble-close')) {
         this._cancelAll(true);
@@ -234,7 +217,6 @@ class FeedbackPrompt {
       }
     });
 
-    // Крестик закрытия
     bubble.querySelector('.feedback-bubble-close').addEventListener('click', (e) => {
       e.stopPropagation();
       this._hideBubble();
@@ -243,14 +225,6 @@ class FeedbackPrompt {
     this._hideTimer = setTimeout(() => this._hideBubble(), AUTO_HIDE_DELAY);
   }
 
-  // ═══════════════════════════════════════
-  // УПРАВЛЕНИЕ ПУЗЫРЁМ
-  // ═══════════════════════════════════════
-
-  /**
-   * Скрыть пузырь.
-   * @param {boolean} [instant=false] — true = удалить мгновенно, false = с анимацией
-   */
   _hideBubble(instant = false) {
     if (!this._bubble) return;
 
@@ -273,18 +247,14 @@ class FeedbackPrompt {
     }
   }
 
-  /**
-   * Полная отмена: таймеры, скролл, пузырь.
-   * @param {boolean} [instant=false] — мгновенное удаление пузыря
-   */
   _cancelAll(instant = false) {
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = null;
     }
     if (this._scrollHandler) {
-      const infoEl = document.getElementById('photo-info');
-      if (infoEl) infoEl.removeEventListener('scroll', this._scrollHandler);
+      const slideEl = document.querySelector('.slide-center');
+      if (slideEl) slideEl.removeEventListener('scroll', this._scrollHandler);
       this._scrollHandler = null;
     }
     this._showing = false;

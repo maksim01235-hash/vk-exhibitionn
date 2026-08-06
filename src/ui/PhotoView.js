@@ -1,8 +1,5 @@
 /**
  * PhotoView — экран фотографии (слайдер с тремя слайдами).
- * 
- * При свайпе двигается вся лента из трёх слайдов.
- * После завершения — центральный обновляется, крайние перестраиваются.
  */
 
 import Store from '../core/Store.js';
@@ -11,13 +8,15 @@ import SwipeManager, { DIRECTION } from './SwipeManager.js';
 import ImagePreloader from '../utils/ImagePreloader.js';
 import FeedbackPrompt from '../utils/FeedbackPrompt.js';
 
-const MAX_IMAGE_HEIGHT_RATIO = 0.55;
 const FULL_FADE_DURATION = 300;
-
 const SWIPE_THRESHOLD = 80;
+const SWIPE_FOLLOW_RATIO = 1.0;
 const SWIPE_RETURN_DURATION = 300;
 const SWIPE_EXIT_DURATION = 250;
-const SWIPE_FOLLOW_RATIO = 1.0;
+
+const TRACK_LEFT = -200;
+const TRACK_CENTER = -100;
+const TRACK_RIGHT = 0;
 
 const PRELOAD_INTERVAL = 100;
 const CLOSE_NEIGHBORS = 2;
@@ -54,11 +53,7 @@ class PhotoView {
     document.addEventListener('visibilitychange', this._handleVisibilityChange);
   }
 
-  // ═══════════════════════════════════════
-  // ПУБЛИЧНЫЙ API
-  // ═══════════════════════════════════════
-
-    render(direction) {
+  render(direction) {
     const photo = Store.getCurrentPhoto();
     if (!photo) return;
 
@@ -71,26 +66,18 @@ class PhotoView {
     const fullUrl = photo.imageUrl || previewUrl;
     const hasPreview = previewUrl !== fullUrl;
 
-    // 1. Сразу ставим preview в центральный слайд (синхронно)
-    if (this._centerImage) {
-      this._centerImage.style.opacity = '0';
-      this._centerImage.src = previewUrl;
-    }
-    if (this._centerWrapper) {
-      this._centerWrapper.classList.add(LOADING_CLASS);
+    this._hideCenterText();
+
+    if (direction) {
+      this._loadPhotoFromSide(previewUrl, fullUrl, hasPreview);
+    } else {
+      this._loadPhotoFromGallery(previewUrl, fullUrl, hasPreview);
     }
 
-    // 2. Обновляем инфо
     if (!this._infoPanel) this._infoPanel = new InfoPanel();
     this._infoPanel.render(photo);
 
-    // 3. Загружаем full в фоне
-    this._showPhotoInContainer(this._centerWrapper, this._centerImage, previewUrl, fullUrl, hasPreview, this._loadId);
-
-    // 4. Боковые слайды
     this._updateSideSlides();
-
-    // 5. Очередь загрузки
     this._buildNeighborsQueue();
     this._processQueue();
 
@@ -109,54 +96,124 @@ class PhotoView {
       this._setupSwipeManager();
     }
 
-    // 6. Телепорт трека в центр
-    if (this._track) {
-      this._track.style.transition = 'none';
-      this._track.style.transform = 'translateX(-100vw)';
-    }
+    this._resetTrackToCenter();
 
-    // 7. Корректировка высоты
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        this._fitWrapper(this._centerWrapper, this._centerImage);
+        this._revealCenterText();
       });
     });
   }
 
   resetSwipe() {
     this._settling = false;
-    if (this._track) {
-      this._track.style.transition = 'none';
-      this._track.style.transform = 'translateX(-100vw)';
-    }
+    this._resetTrackToCenter();
     if (this._swipeManager) {
       this._swipeManager.cancel();
     }
   }
 
-  // ═══════════════════════════════════════
-  // СЛАЙДЫ
-  // ═══════════════════════════════════════
+  _hideCenterText() {
+    const info = document.querySelector('.slide-center .photo-info');
+    if (!info) return;
+    info.style.transition = 'none';
+    info.classList.remove('revealed');
+    info.offsetHeight;
+    info.style.transition = '';
+  }
+
+  _revealCenterText() {
+    const info = document.querySelector('.slide-center .photo-info');
+    if (!info) return;
+    info.classList.add('revealed');
+  }
+
+  _loadPhotoFromGallery(previewUrl, fullUrl, hasPreview) {
+    if (!this._centerImage || !this._centerWrapper) return;
+
+    this._centerImage.style.opacity = '0';
+    this._centerImage.src = previewUrl;
+    this._centerWrapper.classList.add(LOADING_CLASS);
+
+    const showPreview = () => {
+      if (!this._centerImage) return;
+      this._centerImage.style.opacity = '1';
+    };
+
+    if (this._centerImage.complete && this._centerImage.naturalWidth > 0) {
+      showPreview();
+    } else {
+      this._centerImage.onload = showPreview;
+      this._centerImage.onerror = showPreview;
+    }
+
+    if (!hasPreview) {
+      this._centerWrapper.classList.remove(LOADING_CLASS);
+      return;
+    }
+
+    const fullImg = new Image();
+    fullImg.onload = () => this._applyFull(fullUrl);
+    fullImg.onerror = () => this._centerWrapper?.classList.remove(LOADING_CLASS);
+    fullImg.src = fullUrl;
+  }
+
+  _loadPhotoFromSide(previewUrl, fullUrl, hasPreview) {
+    if (!this._centerImage || !this._centerWrapper) return;
+
+    this._centerImage.style.opacity = '0';
+    this._centerImage.src = previewUrl;
+    this._centerWrapper.classList.remove(LOADING_CLASS);
+
+    const showPreview = () => {
+      if (!this._centerImage) return;
+      this._centerImage.style.opacity = '1';
+    };
+
+    if (this._centerImage.complete && this._centerImage.naturalWidth > 0) {
+      showPreview();
+    } else {
+      this._centerImage.onload = showPreview;
+      this._centerImage.onerror = showPreview;
+    }
+
+    if (!hasPreview) return;
+
+    this._centerWrapper.classList.add(LOADING_CLASS);
+
+    const fullImg = new Image();
+    fullImg.onload = () => this._applyFull(fullUrl);
+    fullImg.onerror = () => this._centerWrapper?.classList.remove(LOADING_CLASS);
+    fullImg.src = fullUrl;
+  }
+
+  _applyFull(fullUrl) {
+    if (!this._centerImage || !this._centerWrapper) return;
+    this._centerImage.style.opacity = '0';
+    setTimeout(() => {
+      if (!this._centerImage || !this._centerWrapper) return;
+      this._centerImage.src = fullUrl;
+      this._centerImage.style.opacity = '1';
+      this._centerWrapper.classList.remove(LOADING_CLASS);
+    }, FULL_FADE_DURATION);
+  }
 
   _updateSideSlides() {
     const allPhotos = Store.getAllPhotos();
     const currentIdx = Store.getCurrentIndex();
     const total = allPhotos.length;
 
-    const prevIdx = (currentIdx - 1 + total) % total;
-    const nextIdx = (currentIdx + 1) % total;
-
     if (this._slideLeft) {
       this._slideLeft.innerHTML = '';
-      this._renderSlideContent(this._slideLeft, allPhotos[prevIdx]);
+      this._buildSlideDOM(this._slideLeft, allPhotos[(currentIdx - 1 + total) % total]);
     }
     if (this._slideRight) {
       this._slideRight.innerHTML = '';
-      this._renderSlideContent(this._slideRight, allPhotos[nextIdx]);
+      this._buildSlideDOM(this._slideRight, allPhotos[(currentIdx + 1) % total]);
     }
   }
 
-  _renderSlideContent(container, photo) {
+  _buildSlideDOM(container, photo) {
     if (!photo) return;
 
     const wrapper = document.createElement('div');
@@ -164,11 +221,7 @@ class PhotoView {
 
     const img = document.createElement('img');
     img.alt = '';
-
-    img.onload = () => this._fitWrapper(wrapper, img);
     img.src = photo.imagePreviewUrl || photo.imageUrl;
-    if (img.complete) this._fitWrapper(wrapper, img);
-
     wrapper.appendChild(img);
 
     const info = document.createElement('div');
@@ -181,78 +234,17 @@ class PhotoView {
     this._infoPanel.renderInto(info, photo);
   }
 
-  /**
-   * Установить высоту враппера по размерам изображения.
-   * Использует window.innerWidth для расчёта — не зависит от ширины контейнера.
-   */
-  _fitWrapper(wrapper, img) {
-    if (!wrapper || !img) return;
-    if (!img.naturalWidth || !img.naturalHeight) return;
-
-    const viewportWidth = window.innerWidth;
-    const ratio = img.naturalHeight / img.naturalWidth;
-    const naturalHeight = viewportWidth * ratio;
-    const maxHeight = window.innerHeight * MAX_IMAGE_HEIGHT_RATIO;
-    const h = Math.min(naturalHeight, maxHeight);
-
-    wrapper.style.height = h + 'px';
-  }
-
-  // ═══════════════════════════════════════
-  // SWIPE MANAGER
-  // ═══════════════════════════════════════
-
-  _setupSwipeManager() {
-    const screen = document.getElementById('photo-screen');
-
-    this._swipeManager = new SwipeManager(screen, {
-      threshold: SWIPE_THRESHOLD,
-
-      onMove: (offsetX, offsetY, direction) => {
-        if (this._settling) return;
-        if (direction === DIRECTION.LEFT || direction === DIRECTION.RIGHT) {
-          this._setTrackOffset(offsetX * SWIPE_FOLLOW_RATIO);
-        }
-      },
-
-      onSwipeLeft: () => {
-        if (this._settling) return;
-        this._settling = true;
-        this._animateTrackTo(-200, SWIPE_EXIT_DURATION, () => {
-          Store.next();
-          this.render('left');
-          this._settling = false;
-        });
-      },
-
-      onSwipeRight: () => {
-        if (this._settling) return;
-        this._settling = true;
-        this._animateTrackTo(0, SWIPE_EXIT_DURATION, () => {
-          Store.prev();
-          this.render('right');
-          this._settling = false;
-        });
-      },
-
-      onRelease: (direction) => {
-        if (this._settling) return;
-        if (!direction) {
-          this._settling = true;
-          this._animateTrackTo(-100, SWIPE_RETURN_DURATION, () => {
-            this._settling = false;
-          });
-        }
-      },
-    });
+  _resetTrackToCenter() {
+    if (!this._track) return;
+    this._track.style.transition = 'none';
+    this._track.style.transform = `translateX(${TRACK_CENTER}vw)`;
   }
 
   _setTrackOffset(px) {
     if (!this._track) return;
     const vw = window.innerWidth / 100;
-    const baseOffset = -100 * vw;
     this._track.style.transition = 'none';
-    this._track.style.transform = `translateX(${baseOffset + px}px)`;
+    this._track.style.transform = `translateX(${TRACK_CENTER * vw + px}px)`;
   }
 
   _animateTrackTo(targetVw, duration, callback) {
@@ -275,54 +267,50 @@ class PhotoView {
     }
   }
 
-  // ═══════════════════════════════════════
-  // ЗАГРУЗКА ИЗОБРАЖЕНИЯ
-  // ═══════════════════════════════════════
+  _setupSwipeManager() {
+    const screen = document.getElementById('photo-screen');
 
-  _showPhotoInContainer(wrapper, img, previewUrl, fullUrl, hasPreview, loadId) {
-    if (!wrapper || !img) return;
+    this._swipeManager = new SwipeManager(screen, {
+      threshold: SWIPE_THRESHOLD,
 
-    // Ждём загрузки preview чтобы показать
-    const tempImg = new Image();
-    tempImg.onload = () => {
-      if (loadId !== this._loadId) return;
-      // preview уже установлен в img.src — просто показываем
-      img.style.opacity = '1';
+      onMove: (offsetX, offsetY, direction) => {
+        if (this._settling) return;
+        if (direction === DIRECTION.LEFT || direction === DIRECTION.RIGHT) {
+          this._setTrackOffset(offsetX * SWIPE_FOLLOW_RATIO);
+        }
+      },
 
-      if (!hasPreview) {
-        wrapper.classList.remove(LOADING_CLASS);
-        return;
-      }
+      onSwipeLeft: () => {
+        if (this._settling) return;
+        this._settling = true;
+        this._animateTrackTo(TRACK_LEFT, SWIPE_EXIT_DURATION, () => {
+          Store.next();
+          this.render('left');
+          this._settling = false;
+        });
+      },
 
-      // Грузим full
-      const fullImg = new Image();
-      fullImg.onload = () => {
-        if (loadId !== this._loadId) return;
-        img.style.opacity = '0';
-        setTimeout(() => {
-          if (loadId !== this._loadId) return;
-          img.src = fullUrl;
-          img.style.opacity = '1';
-          wrapper.classList.remove(LOADING_CLASS);
-        }, FULL_FADE_DURATION);
-      };
-      fullImg.onerror = () => {
-        if (loadId !== this._loadId) return;
-        wrapper.classList.remove(LOADING_CLASS);
-      };
-      fullImg.src = fullUrl;
-    };
-    tempImg.onerror = () => {
-      if (loadId !== this._loadId) return;
-      img.style.opacity = '1';
-      wrapper.classList.remove(LOADING_CLASS);
-    };
-    tempImg.src = previewUrl;
+      onSwipeRight: () => {
+        if (this._settling) return;
+        this._settling = true;
+        this._animateTrackTo(TRACK_RIGHT, SWIPE_EXIT_DURATION, () => {
+          Store.prev();
+          this.render('right');
+          this._settling = false;
+        });
+      },
+
+      onRelease: (direction) => {
+        if (this._settling) return;
+        if (!direction) {
+          this._settling = true;
+          this._animateTrackTo(TRACK_CENTER, SWIPE_RETURN_DURATION, () => {
+            this._settling = false;
+          });
+        }
+      },
+    });
   }
-
-  // ═══════════════════════════════════════
-  // ОЧЕРЕДЬ ФОНОВОЙ ЗАГРУЗКИ
-  // ═══════════════════════════════════════
 
   _buildNeighborsQueue() {
     const allPhotos = Store.getAllPhotos();
