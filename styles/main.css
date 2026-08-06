@@ -565,3 +565,55 @@ html, body {
   width: 36px;
   height: 36px;
 }
+
+/* Пузырь подсказки обратной связи */
+.feedback-bubble {
+  position: fixed;
+  bottom: 133px;
+  right: 23px;
+  max-width: 250px;
+  min-width: 200px;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  padding: 16px 36px 16px 18px;
+  border-radius: 18px 18px 6px 18px;
+  font-size: 16px;
+  line-height: 1.45;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 101;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.feedback-bubble.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.feedback-bubble-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--bg-primary);
+  opacity: 0.6;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px 6px;
+  line-height: 1;
+}
+.feedback-bubble-close:active {
+  opacity: 1;
+}
+.feedback-bubble-tail {
+  position: absolute;
+  bottom: -8px;
+  right: 20px;
+  width: 16px;
+  height: 10px;
+  background: var(--text-primary);
+  clip-path: polygon(0 0, 100% 0, 70% 100%);
+}

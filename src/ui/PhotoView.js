@@ -2,6 +2,7 @@ import Store from '../core/Store.js';
 import InfoPanel from './InfoPanel.js';
 import SwipeManager from './SwipeManager.js';
 import ImagePreloader from '../utils/ImagePreloader.js';
+import FeedbackPrompt from '../utils/FeedbackPrompt.js';
 
 class PhotoView {
   constructor() {
@@ -21,6 +22,8 @@ class PhotoView {
 
     this._clearPreloadQueue();
     this._currentPhotoId = photo.id;
+        // Подсказка обратной связи
+    FeedbackPrompt.onPhotoOpened(photo.id);
 
     const previewUrl = photo.imagePreviewUrl || photo.imageUrl;
     const fullUrl = photo.imageUrl || previewUrl;
