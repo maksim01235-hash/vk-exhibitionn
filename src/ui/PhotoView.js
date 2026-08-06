@@ -14,26 +14,29 @@ class PhotoView {
     this._currentPhotoId = null;
     this._preloadQueue = [];
     this._preloadTimer = null;
-    this._fullLoaded = false;
+    this._loadId = 0; // Счётчик загрузок для отслеживания гонки
   }
 
   render(direction) {
     const photo = Store.getCurrentPhoto();
     if (!photo) return;
     
-    const oldPhotoId = this._currentPhotoId;
+    // Если то же фото и уже загружается/загружено — не перерендериваем
+    if (!direction && this._currentPhotoId === photo.id) return;
+    
     this._currentPhotoId = photo.id;
+    this._loadId++;
 
     const previewUrl = photo.imagePreviewUrl || photo.imageUrl;
     const fullUrl = photo.imageUrl || previewUrl;
     const hasPreview = previewUrl !== fullUrl;
 
-    if (direction && oldPhotoId !== photo.id) {
+    if (direction) {
       this._animateSwipe(direction, () => {
-        this._showPhoto(previewUrl, fullUrl, hasPreview);
+        this._showPhoto(previewUrl, fullUrl, hasPreview, this._loadId);
       });
     } else {
-      this._showPhoto(previewUrl, fullUrl, hasPreview);
+      this._showPhoto(previewUrl, fullUrl, hasPreview, this._loadId);
     }
 
     this._buildNeighborsQueue();
@@ -62,82 +65,57 @@ class PhotoView {
     }
   }
 
-  _showPhoto(previewUrl, fullUrl, hasPreview) {
-    this._fullLoaded = false;
-
-    const fitWrapper = (naturalWidth, naturalHeight) => {
-      if (!naturalWidth || !naturalHeight) return;
-      const wrapperWidth = this._imageWrapper.clientWidth;
-      const ratio = naturalHeight / naturalWidth;
+  _showPhoto(previewUrl, fullUrl, hasPreview, loadId) {
+    const fitWrapper = () => {
+      const img = this._imageEl;
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      const ratio = img.naturalHeight / img.naturalWidth;
       const maxHeight = window.innerHeight * 0.55;
-      const h = Math.min(wrapperWidth * ratio, maxHeight);
+      const h = Math.min(this._imageWrapper.clientWidth * ratio, maxHeight);
       this._imageWrapper.style.height = h + 'px';
     };
 
-    // Всегда показываем индикатор при загрузке
-    if (!this._fullLoaded) {
-      this._imageWrapper.classList.add('loading-full');
-    }
-
+    this._imageWrapper.classList.add('loading-full');
     this._imageEl.style.opacity = '0';
-    this._imageEl.src = previewUrl;
 
-    const onPreviewLoaded = () => {
+    // Загружаем preview
+    const tempImg = new Image();
+    tempImg.onload = () => {
+      if (loadId !== this._loadId) return; // Устарело
+      this._imageEl.src = previewUrl;
+      fitWrapper();
+      this._imageEl.style.opacity = '1';
+
       if (!hasPreview) {
-        if (this._imageEl.complete) {
-          fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
-          this._imageEl.style.opacity = '1';
-          this._imageWrapper.classList.remove('loading-full');
-          this._fullLoaded = true;
-        } else {
-          this._imageEl.onload = () => {
-            fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
-            this._imageEl.style.opacity = '1';
-            this._imageWrapper.classList.remove('loading-full');
-            this._fullLoaded = true;
-          };
-        }
+        this._imageWrapper.classList.remove('loading-full');
         return;
       }
 
-      ImagePreloader.preload(fullUrl).then((fullImgUrl) => {
-        if (Store.getCurrentPhoto()?.id !== this._currentPhotoId) return;
-
-        const tmp = new Image();
-        tmp.onload = () => {
-          if (Store.getCurrentPhoto()?.id !== this._currentPhotoId) return;
-          fitWrapper(tmp.naturalWidth, tmp.naturalHeight);
-          
-          this._imageEl.style.opacity = '0';
-          setTimeout(() => {
-            if (Store.getCurrentPhoto()?.id !== this._currentPhotoId) return;
-            this._imageEl.src = fullUrl;
-            this._fullLoaded = true;
-            this._imageWrapper.classList.remove('loading-full');
-            
-            if (this._imageEl.complete) {
-              this._imageEl.style.opacity = '1';
-            } else {
-              this._imageEl.onload = () => { this._imageEl.style.opacity = '1'; };
-            }
-          }, 400);
-        };
-        tmp.onerror = () => {
-          fitWrapper(this._imageEl.naturalWidth, this._imageEl.naturalHeight);
+      // Загружаем full
+      const fullImg = new Image();
+      fullImg.onload = () => {
+        if (loadId !== this._loadId) return;
+        this._imageEl.style.opacity = '0';
+        setTimeout(() => {
+          if (loadId !== this._loadId) return;
+          this._imageEl.src = fullUrl;
+          fitWrapper();
           this._imageEl.style.opacity = '1';
           this._imageWrapper.classList.remove('loading-full');
-          this._fullLoaded = true;
-        };
-        tmp.src = fullUrl;
-      });
+        }, 300);
+      };
+      fullImg.onerror = () => {
+        if (loadId !== this._loadId) return;
+        this._imageWrapper.classList.remove('loading-full');
+      };
+      fullImg.src = fullUrl;
     };
-
-    if (this._imageEl.complete && this._imageEl.naturalWidth > 0) {
-      onPreviewLoaded();
-    } else {
-      this._imageEl.onload = onPreviewLoaded;
-      this._imageEl.onerror = onPreviewLoaded;
-    }
+    tempImg.onerror = () => {
+      if (loadId !== this._loadId) return;
+      this._imageEl.style.opacity = '1';
+      this._imageWrapper.classList.remove('loading-full');
+    };
+    tempImg.src = previewUrl;
   }
 
   _animateSwipe(direction, callback) {
@@ -207,7 +185,6 @@ class PhotoView {
     }
 
     this._preloadQueue = [...urgent, ...deferred];
-    console.log('Queue: urgent', urgent.length, 'deferred', deferred.length, 'total', this._preloadQueue.length);
   }
 
   _clearPreloadQueue() {
@@ -221,7 +198,6 @@ class PhotoView {
   _processQueue() {
     if (this._preloadQueue.length === 0) return;
     const item = this._preloadQueue.shift();
-    console.log('Preload:', item.url.substring(item.url.lastIndexOf('/') + 1).substring(0, 40));
     ImagePreloader.preload(item.url);
     this._preloadTimer = setTimeout(() => this._processQueue(), 100);
   }
