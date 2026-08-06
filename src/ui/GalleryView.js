@@ -8,6 +8,7 @@ class GalleryView {
     this._grid = document.getElementById('gallery-grid');
     this._empty = document.getElementById('gallery-empty');
     this._allPreviewsLoaded = false;
+    this._rendered = false;
   }
 
   render() {
@@ -17,21 +18,28 @@ class GalleryView {
       this._grid.innerHTML = '';
       this._grid.classList.add('hidden');
       this._empty.classList.remove('hidden');
+      this._rendered = false;
       return;
     }
 
     this._empty.classList.add('hidden');
     this._grid.classList.remove('hidden');
-    this._grid.innerHTML = photos.map(photo => this._renderCard(photo)).join('');
 
-    this._grid.querySelectorAll('.gallery-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const id = card.dataset.photoId;
-        EventBus.emit('router:openPhoto', id);
+    // Перерисовываем только если ещё не рендерили или данные изменились
+    if (!this._rendered) {
+      this._grid.innerHTML = photos.map(photo => this._renderCard(photo)).join('');
+
+      this._grid.querySelectorAll('.gallery-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const id = card.dataset.photoId;
+          EventBus.emit('router:openPhoto', id);
+        });
       });
-    });
 
-    // Предзагружаем все превью только один раз за сессию
+      this._rendered = true;
+    }
+
+    // Предзагружаем все превью только один раз
     if (!this._allPreviewsLoaded) {
       this._allPreviewsLoaded = true;
       const previewUrls = photos.map(p => p.imagePreviewUrl || p.imageUrl).filter(Boolean);
