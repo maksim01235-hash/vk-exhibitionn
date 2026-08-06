@@ -1,6 +1,7 @@
 import Store from '../core/Store.js';
 import EventBus from '../core/EventBus.js';
 import ImagePreloader from '../utils/ImagePreloader.js';
+import { renderMarkdown } from '../utils/markdown.js';
 
 class GalleryView {
   constructor() {
@@ -22,7 +23,6 @@ class GalleryView {
     this._grid.classList.remove('hidden');
     this._grid.innerHTML = photos.map(photo => this._renderCard(photo)).join('');
 
-    // Навешиваем обработчики
     this._grid.querySelectorAll('.gallery-card').forEach(card => {
       card.addEventListener('click', () => {
         const id = card.dataset.photoId;
@@ -30,7 +30,6 @@ class GalleryView {
       });
     });
 
-    // Предзагружаем первые 10 изображений в фоне
     const urls = photos.slice(0, 10).map(p => p.imageUrl).filter(Boolean);
     ImagePreloader.preloadAll(urls);
   }
@@ -43,8 +42,8 @@ class GalleryView {
           <img src="${imgSrc}" alt="${this._escape(photo.title || '')}" loading="lazy" />
         </div>
         <div class="gallery-card-info">
-          <div class="gallery-card-title">${this._escape(photo.title || 'Без названия')}</div>
-          ${photo.photographer ? `<div class="gallery-card-author">${this._escape(photo.photographer)}</div>` : ''}
+          <div class="gallery-card-title">${renderMarkdown(photo.title || 'Без названия')}</div>
+          ${photo.photographer ? `<div class="gallery-card-author">${renderMarkdown(photo.photographer)}</div>` : ''}
         </div>
       </div>
     `;
