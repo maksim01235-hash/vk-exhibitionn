@@ -566,6 +566,13 @@ html, body {
   height: 36px;
 }
 
+/* Все иконки в кнопках — единый размер */
+.icon-btn svg,
+.icon-btn i {
+  width: 36px;
+  height: 36px;
+}
+
 /* Пузырь подсказки обратной связи */
 .feedback-bubble {
   position: fixed;
