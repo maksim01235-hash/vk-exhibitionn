@@ -26,7 +26,7 @@ const STATIC_ASSETS = [
   'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js',
 ];
 
-// Установка: кешируем статику
+// Установка
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -37,7 +37,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Активация: чистим старые кеши
+// Активация
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -48,17 +48,24 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Перехват запросов: кеш → сеть
+// Проверка: можно ли кешировать ответ
+function isCacheable(response) {
+  return response && response.ok && response.status === 200;
+}
+
+// Перехват запросов
 self.addEventListener('fetch', (event) => {
-  // Пропускаем запросы к API и Google Sheets
   const url = new URL(event.request.url);
+
+  // Данные таблицы и API: сеть → кеш
   if (url.hostname === 'docs.google.com' || url.hostname === 'api.emailjs.com') {
-    // Для данных таблицы: сеть → кеш
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+          if (isCacheable(response)) {
+            const cloned = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+          }
           return response;
         })
         .catch(() => caches.match(event.request))
@@ -66,25 +73,36 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Для всего остального: кеш → сеть → кеш
+  // Всё остальное: кеш → сеть → кеш
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // В фоне обновляем кеш
-        fetch(event.request).then((response) => {
-          if (response.ok) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
-          }
-        }).catch(() => {});
+        // Фоновое обновление кеша
+        fetch(event.request)
+          .then((response) => {
+            if (isCacheable(response)) {
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
+            }
+          })
+          .catch(() => {}); // Молча игнорируем ошибки сети
         return cachedResponse;
       }
 
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200) return response;
-        const cloned = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
-        return response;
-      });
+      return fetch(event.request)
+        .then((response) => {
+          if (isCacheable(response)) {
+            const cloned = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+          }
+          return response;
+        })
+        .catch((err) => {
+          // Возвращаем заглушку для изображений при ошибке
+          if (event.request.destination === 'image') {
+            return caches.match('/assets/placeholder.jpg');
+          }
+          throw err;
+        });
     })
   );
 });

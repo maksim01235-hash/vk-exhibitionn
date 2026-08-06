@@ -3,7 +3,7 @@ import DataLayer from './data/DataLayer.js';
 import Router from './core/Router.js';
 import UIManager from './ui/UIManager.js';
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 
 async function init() {
   console.log(`Выставка v${APP_VERSION}: инициализация...`);

@@ -39,8 +39,8 @@ class DataLayer {
 
     const headers = this._parseCSVRow(lines[0]).map(h => h.trim());
     const photos = [];
-
-    const baseFields = ['id', 'order', 'title', 'photographer', 'description', 'funFact', 'imageUrl', 'category'];
+const baseFields = ['id', 'order', 'title', 'photographer', 'description', 'funFact', 'imageUrl', 'imagePreviewUrl', 'originalUrl', 'category'];
+   
 
     for (let i = 1; i < lines.length; i++) {
       const row = this._parseCSVRow(lines[i]);

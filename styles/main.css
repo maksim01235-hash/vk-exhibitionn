@@ -538,3 +538,21 @@ html, body {
 .feedback-error.hidden {
   display: none;
 }
+/* Ссылка на оригинал */
+.photo-original-link {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+.photo-original-link a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.photo-original-link a:active {
+  color: var(--text-primary);
+}
