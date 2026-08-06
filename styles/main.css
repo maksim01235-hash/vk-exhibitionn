@@ -84,8 +84,12 @@ html, body {
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-primary);
   flex-shrink: 0;
+  position: relative;
 }
 .toolbar-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.3px;

@@ -13,7 +13,7 @@ class Router {
           window.vkBridge.send('VKWebAppGetLaunchParams'),
           2000
         );
-        console.log('VK Launch Params:', launchParams);
+        console.log('VK Launch Params:', JSON.stringify(launchParams));
         
         if (launchParams && launchParams.vk_connect_args) {
           const id = this._extractPhotoId(launchParams.vk_connect_args);
@@ -24,7 +24,7 @@ class Router {
       console.log('VK Bridge:', e.message);
     }
 
-    // 2. Проверяем хеш
+    // 2. Хеш из URL
     this._checkHash();
     setTimeout(() => this._checkHash(), 300);
     setTimeout(() => this._checkHash(), 800);
@@ -45,9 +45,34 @@ class Router {
     console.log('Router: хеш =', hash);
     
     if (hash && hash.length > 1) {
-      const id = this._extractPhotoId(hash.substring(1));
+      const id = this._extractPhotoId(hash);
       if (id) this._openPhoto(id);
     }
+  }
+
+  _extractPhotoId(data) {
+    if (!data) return null;
+    
+    // Убираем # и /
+    let str = String(data).trim();
+    if (str.startsWith('#')) str = str.substring(1);
+    if (str.startsWith('/')) str = str.substring(1);
+    
+    // Если это URL вида https://vk.com/app54708970/#1
+    if (str.includes('vk.com/app')) {
+      const match = str.match(/\/#\/?(\d+)/);
+      if (match) return match[1];
+      // Может быть ?photo=1
+      const url = new URL(str);
+      const id = url.searchParams.get('photo') || url.searchParams.get('id');
+      if (id) return id;
+      return null;
+    }
+    
+    // Если просто число
+    if (/^\d+$/.test(str)) return str;
+    
+    return null;
   }
 
   _withTimeout(promise, ms) {
@@ -56,17 +81,6 @@ class Router {
       promise.then(r => { clearTimeout(timer); resolve(r); })
              .catch(e => { clearTimeout(timer); reject(e); });
     });
-  }
-
-  _extractPhotoId(data) {
-    if (!data) return null;
-    if (/^\d+$/.test(data.trim())) return data.trim();
-    try {
-      const json = JSON.parse(data);
-      if (json.photoId) return String(json.photoId);
-      if (json.id) return String(json.id);
-    } catch (e) {}
-    return null;
   }
 }
 

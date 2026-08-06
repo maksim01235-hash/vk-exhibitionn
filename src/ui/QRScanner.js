@@ -24,12 +24,9 @@ class QRScanner {
       
       await this._reader.start(
         { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => this._onScanSuccess(decodedText),
-        () => {} // Игнорируем ошибки сканирования
+        () => {}
       );
     } catch (err) {
       console.log('Камера недоступна:', err.message);
@@ -42,9 +39,12 @@ class QRScanner {
   }
 
   _onScanSuccess(decodedText) {
+    console.log('QR считан:', decodedText);
     this.stop();
     
     const id = Router._extractPhotoId(decodedText);
+    console.log('QR: извлечён ID =', id);
+    
     if (id) {
       EventBus.emit('router:openPhoto', id);
     } else {
@@ -57,9 +57,7 @@ class QRScanner {
     if (this._reader && this._isRunning) {
       try {
         this._reader.stop().catch(() => {});
-      } catch (e) {
-        // Игнорируем
-      }
+      } catch (e) {}
       this._isRunning = false;
     }
   }
