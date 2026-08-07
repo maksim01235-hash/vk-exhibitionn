@@ -121,8 +121,11 @@ class UIManager {
     document.getElementById('scan-btn-gallery').addEventListener('click', () => this.showQR());
     document.getElementById('scan-btn-photo').addEventListener('click', () => this.showQR());
     document.getElementById('back-to-gallery-btn').addEventListener('click', () => this.showGallery());
-    document.getElementById('close-qr-btn').addEventListener('click', () => this._goBack());
-
+        document.getElementById('close-qr-btn').addEventListener('click', () => {
+      if (this._currentScreen === 'qr') {
+        this._closeQR();
+      }
+    });
     // Кнопка обратной связи
     const feedbackBtn = document.getElementById('feedback-btn');
     if (feedbackBtn) {
@@ -221,7 +224,6 @@ class UIManager {
    * Показать QR-сканер.
    */
   showQR() {
-    // Запоминаем откуда пришли
     this._screenBeforeQR = this._currentScreen;
 
     this._currentScreen = 'qr';
@@ -229,23 +231,46 @@ class UIManager {
     this._photoScreen.classList.add('hidden');
     this._hideFeedbackScreen();
     this._qrScreen.classList.remove('hidden');
+    this._qrScreen.classList.remove('closing'); // убираем класс закрытия если был
     this._qrScanner.start();
     this._photoView.resetSwipe();
     this._setFeedbackBtnShifted(false);
   }
+   _closeQR() {
+    const qrScreen = this._qrScreen;
 
+    // Показываем целевой экран сразу, до анимации
+    if (this._screenBeforeQR === 'photo') {
+      this._currentScreen = 'photo';
+      this._galleryScreen.classList.add('hidden');
+      this._photoScreen.classList.remove('hidden');
+      this._qrScreen.classList.add('hidden');
+      this._setFeedbackBtnShifted(true);
+    } else {
+      this.showGallery();
+      // showGallery скрывает qrScreen, возвращаем видимость для анимации
+      this._qrScreen.classList.remove('hidden');
+    }
+
+    this._qrScanner.stop();
+
+    // Запускаем анимацию закрытия поверх уже видимого экрана
+    qrScreen.classList.add('closing');
+
+    const onEnd = () => {
+      qrScreen.removeEventListener('animationend', onEnd);
+      qrScreen.classList.add('hidden');
+      qrScreen.classList.remove('closing');
+    };
+
+    qrScreen.addEventListener('animationend', onEnd);
+  }
   /**
    * Вернуться назад (из QR-сканера или фото — в галерею).
    */
   _goBack() {
     if (this._currentScreen === 'qr') {
-      this._qrScanner.stop();
-
-      if (this._screenBeforeQR === 'photo') {
-        this.showPhoto();
-      } else {
-        this.showGallery();
-      }
+      this._closeQR();
     } else if (this._currentScreen === 'photo') {
       this.showGallery();
     }
