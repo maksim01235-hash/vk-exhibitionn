@@ -23,7 +23,7 @@ const FADE_DURATION = 400;
  * чтобы свайп был засчитан как смена слайда.
  * Увеличьте для более «тугого» переключения.
  */
-const SWIPE_THRESHOLD = 100;
+const SWIPE_THRESHOLD = 90;
 
 /**
  * Множитель следования трека за пальцем.
@@ -64,13 +64,13 @@ const TRACK_RIGHT = 0;
  * Задержка между загрузками изображений в очереди (мс).
  * Чтобы не нагружать сеть одновременными запросами.
  */
-const PRELOAD_INTERVAL = 100;
+const PRELOAD_INTERVAL = 50;
 
 /** Сколько ближайших соседей грузить в первую очередь (в каждую сторону) */
-const CLOSE_NEIGHBORS = 2;
+const CLOSE_NEIGHBORS = 1;
 
 /** Дальние соседи: начало диапазона (в каждую сторону) */
-const FAR_NEIGHBORS_START = 3;
+const FAR_NEIGHBORS_START = 2;
 
 /** Дальние соседи: конец диапазона (в каждую сторону) */
 const FAR_NEIGHBORS_END = 5;

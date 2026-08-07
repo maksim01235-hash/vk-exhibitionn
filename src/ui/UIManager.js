@@ -8,6 +8,7 @@ import GalleryView from './GalleryView.js';
 import PhotoView from './PhotoView.js';
 import QRScanner from './QRScanner.js';
 import FeedbackPrompt from '../utils/FeedbackPrompt.js';
+import CONFIG from '../config.js';
 
 const SCREENS = {
   gallery:  'gallery-screen',
@@ -17,12 +18,6 @@ const SCREENS = {
 };
 
 const SHIFTED_CLASS = 'shifted';
-
-const EMAILJS = {
-  serviceId:  'service_ym4iqcu',
-  templateId: 'template_x16we4g',
-  publicKey:  'oRCD9VBQMxpxKkwIm',
-};
 
 class UIManager {
   constructor() {
@@ -300,7 +295,7 @@ class UIManager {
       time: new Date().toLocaleString('ru-RU'),
     };
 
-    emailjs.send(EMAILJS.serviceId, EMAILJS.templateId, templateParams, EMAILJS.publicKey)
+    emailjs.send(CONFIG.EMAILJS.SERVICE_ID, CONFIG.EMAILJS.TEMPLATE_ID, templateParams, CONFIG.EMAILJS.PUBLIC_KEY)
       .then(() => {
         form.classList.add('hidden');
         errorEl.classList.add('hidden');

@@ -57,16 +57,16 @@ const MAX_PROMPTS = 3;
 const RESET_AFTER_PHOTOS = 10;
 
 /** Задержка перед проверкой скролла после открытия фото (мс) */
-const CHECK_DELAY = 800;
+const CHECK_DELAY = 2000;
 
 /** Через сколько показать пузырь, если описание не скроллится (мс) */
-const NO_SCROLL_TIMER = 5000;
+const NO_SCROLL_TIMER = 15000;
 
 /** Задержка после доскролливания до пузыря (мс) */
 const SCROLL_END_DELAY = 1500;
 
 /** Порог «конец скролла» в пикселях от низа */
-const SCROLL_THRESHOLD = 40;
+const SCROLL_THRESHOLD = 100;
 
 /** Через сколько пузырь скроется сам, если не кликнули (мс) */
 const AUTO_HIDE_DELAY = 10000;
@@ -75,7 +75,7 @@ const AUTO_HIDE_DELAY = 10000;
 const BUBBLE_ANIMATION = 300;
 
 /** Минимальный интервал между показами (мс). Защита от двойного срабатывания */
-const SHOW_DEBOUNCE = 500;
+const SHOW_DEBOUNCE = 1000;
 
 /** Дебаунс скролл-события (мс). Снижает нагрузку на главный поток */
 const SCROLL_DEBOUNCE = 100;

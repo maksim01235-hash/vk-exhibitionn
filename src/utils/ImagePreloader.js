@@ -5,7 +5,7 @@
 
 const STORAGE_KEY = 'vk_exhibition_loaded_images';
 const MAX_STORED_URLS = 200;
-const MAX_CONCURRENT = 2; // Максимум одновременных загрузок
+const MAX_CONCURRENT = 4; // Максимум одновременных загрузок
 const BACKGROUND_DELAY = 500;
 
 class ImagePreloader {

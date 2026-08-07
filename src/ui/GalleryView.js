@@ -32,13 +32,13 @@ import { renderMarkdown } from '../utils/markdown.js';
  * Сколько URL грузить одновременно. Увеличь для быстрой загрузки,
  * уменьшь для экономии трафика.
  */
-const BATCH_SIZE = 2;
+const BATCH_SIZE = 10;
 
 /**
  * Задержка между пачками загрузки (мс).
  * Чтобы не нагружать сеть одновременными запросами.
  */
-const BATCH_DELAY = 200;
+const BATCH_DELAY = 50;
 
 /**
  * Настройки IntersectionObserver.
