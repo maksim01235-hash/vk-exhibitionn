@@ -3,20 +3,9 @@ import EventBus from '../core/EventBus.js';
 import ImagePreloader from '../utils/ImagePreloader.js';
 import { renderMarkdown } from '../utils/markdown.js';
 
-// ═══════════════════════════════════════
-// КОНСТАНТЫ
-// ═══════════════════════════════════════
-
-/** Количество видимых фото для немедленной загрузки */
 const VISIBLE_COUNT = 6;
-
-/** Количество фото для загрузки вблизи видимой области (в каждую сторону) */
 const NEARBY_COUNT = 4;
-
-/** Порог «близости» в пикселях (фото в этой зоне считаются nearby) */
 const NEARBY_THRESHOLD = 600;
-
-/** Задержка между пачками загрузки (мс) */
 const BATCH_DELAY = 200;
 
 class GalleryView {
@@ -27,6 +16,8 @@ class GalleryView {
     this._loadedIndices = new Set();
     this._preloadQueue = [];
     this._preloadTimer = null;
+    this._scrollTimer = null;
+    this._rendered = false;  // ← флаг что грид уже построен
   }
 
   render() {
@@ -38,32 +29,37 @@ class GalleryView {
       this._grid.innerHTML = '';
       this._grid.classList.add('hidden');
       this._empty.classList.remove('hidden');
+      this._rendered = false;
       return;
     }
 
     this._empty.classList.add('hidden');
     this._grid.classList.remove('hidden');
 
-    this._grid.innerHTML = photos.map(photo => this._renderCard(photo)).join('');
+    // Строим грид только один раз
+    if (!this._rendered) {
+      this._grid.innerHTML = photos.map(photo => this._renderCard(photo)).join('');
 
-    this._grid.querySelectorAll('.gallery-card').forEach(card => {
-      card.addEventListener('click', () => {
-        EventBus.emit('router:openPhoto', card.dataset.photoId);
+      this._grid.querySelectorAll('.gallery-card').forEach(card => {
+        card.addEventListener('click', () => {
+          EventBus.emit('router:openPhoto', card.dataset.photoId);
+        });
       });
-    });
 
-    if (!this._initialized) {
-      this._grid.addEventListener('scroll', () => this._prioritizeLoad(photos), { passive: true });
-      this._initialized = true;
+      this._grid.addEventListener('scroll', () => {
+        if (this._scrollTimer) clearTimeout(this._scrollTimer);
+        this._scrollTimer = setTimeout(() => this._prioritizeLoad(photos), 150);
+      }, { passive: true });
+
+      this._rendered = true;
     }
 
-    // Отложенная приоритетная загрузка — не блокируем рендер
-    setTimeout(() => this._prioritizeLoad(photos), 100);
+    // Приоритетная загрузка — без setTimeout, один раз при открытии
+    if (this._loadedIndices.size === 0) {
+      this._prioritizeLoad(photos);
+    }
   }
 
-  /**
-   * Приоритетная загрузка: видимые → близкие → дальние.
-   */
   _prioritizeLoad(photos) {
     const gridRect = this._grid.getBoundingClientRect();
     const cards = this._grid.querySelectorAll('.gallery-card');
@@ -82,25 +78,20 @@ class GalleryView {
       const distance = Math.abs(cardCenter - gridCenter);
 
       if (distance < gridRect.height / 2 + 50) {
-        // Видимо или почти видимо
         visible.push(index);
       } else if (distance < gridRect.height / 2 + NEARBY_THRESHOLD) {
-        // Близко к видимой области
         nearby.push(index);
       } else {
-        // Далеко
         far.push(index);
       }
     });
 
-    // Строим очередь: видимые → близкие → дальние
     const queue = [
       ...visible.slice(0, VISIBLE_COUNT),
       ...nearby.slice(0, NEARBY_COUNT * 2),
       ...far,
     ];
 
-    // Ограничиваем общее количество за раз
     const toLoad = queue.slice(0, VISIBLE_COUNT + NEARBY_COUNT * 2 + 10);
 
     toLoad.forEach(index => this._loadedIndices.add(index));
@@ -116,9 +107,6 @@ class GalleryView {
     }
   }
 
-  /**
-   * Загрузить URL пачками.
-   */
   _preloadInBatches(urls) {
     if (urls.length === 0) return;
 

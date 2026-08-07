@@ -27,6 +27,8 @@ const LOADING_CLASS = 'loading-full';
 
 class PhotoView {
   constructor() {
+    this._prevSideIndex = -1;
+    this._nextSideIndex = -1;
     this._track = document.querySelector('.slides-track');
     this._slideLeft = document.querySelector('.slide-left .slide-content');
     this._slideCenter = document.querySelector('.slide-center .slide-content');
@@ -99,9 +101,7 @@ class PhotoView {
     this._resetTrackToCenter();
 
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        this._revealCenterText();
-      });
+      this._revealCenterText();
     });
   }
 
@@ -203,13 +203,19 @@ class PhotoView {
     const currentIdx = Store.getCurrentIndex();
     const total = allPhotos.length;
 
-    if (this._slideLeft) {
+    const prevIdx = (currentIdx - 1 + total) % total;
+    const nextIdx = (currentIdx + 1) % total;
+
+    // Пересоздаём только если индексы изменились
+    if (this._slideLeft && this._prevSideIndex !== prevIdx) {
+      this._prevSideIndex = prevIdx;
       this._slideLeft.innerHTML = '';
-      this._buildSlideDOM(this._slideLeft, allPhotos[(currentIdx - 1 + total) % total]);
+      this._buildSlideDOM(this._slideLeft, allPhotos[prevIdx]);
     }
-    if (this._slideRight) {
+    if (this._slideRight && this._nextSideIndex !== nextIdx) {
+      this._nextSideIndex = nextIdx;
       this._slideRight.innerHTML = '';
-      this._buildSlideDOM(this._slideRight, allPhotos[(currentIdx + 1) % total]);
+      this._buildSlideDOM(this._slideRight, allPhotos[nextIdx]);
     }
   }
 
@@ -329,12 +335,11 @@ class PhotoView {
 
     for (let d = 1; d <= CLOSE_NEIGHBORS; d++) {
       [d, -d].forEach(dist => {
-        const idx = (currentIdx + dist + total) % total;
-        const p = allPhotos[idx];
+        const p = allPhotos[(currentIdx + dist + total) % total];
         if (!p) return;
         const pUrl = p.imagePreviewUrl || p.imageUrl;
         if (pUrl) urgent.push({ url: pUrl });
-        if (p.imageUrl && p.imageUrl !== (p.imagePreviewUrl || p.imageUrl)) {
+        if (p.imageUrl && p.imageUrl !== pUrl) {
           urgent.push({ url: p.imageUrl });
         }
       });
@@ -342,12 +347,11 @@ class PhotoView {
 
     for (let d = FAR_NEIGHBORS_START; d <= FAR_NEIGHBORS_END; d++) {
       [d, -d].forEach(dist => {
-        const idx = (currentIdx + dist + total) % total;
-        const p = allPhotos[idx];
+        const p = allPhotos[(currentIdx + dist + total) % total];
         if (!p) return;
         const pUrl = p.imagePreviewUrl || p.imageUrl;
         if (pUrl) deferred.push({ url: pUrl });
-        if (p.imageUrl && p.imageUrl !== (p.imagePreviewUrl || p.imageUrl)) {
+        if (p.imageUrl && p.imageUrl !== pUrl) {
           deferred.push({ url: p.imageUrl });
         }
       });

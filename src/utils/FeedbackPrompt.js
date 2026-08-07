@@ -1,14 +1,17 @@
 /**
  * FeedbackPrompt — подсказка обратной связи («пузырь»).
- * 
- * Появляется после прочтения описания фото (скролл до конца) или по таймауту,
- * если скроллить нечего. Содержит случайную фразу, при клике открывает
- * форму обратной связи.
  */
 
 // ═══════════════════════════════════════
 // НАСТРОЙКИ
 // ═══════════════════════════════════════
+/**
+ * Таймаут перед первым показом пузыря после открытия приложения (мс).
+ * Пузырь не появится раньше этого времени, даже если условия выполнены.
+ * 10 минут = 600 000 мс.
+ * Установи 0 для отключения задержки.
+ */
+const INITIAL_DELAY = 30000; // 10 минут
 
 const MESSAGES = [
   'Понравилась выставка?',
@@ -16,36 +19,15 @@ const MESSAGES = [
   'Поделитесь впечатлениями',
 ];
 
-/** Максимальное количество показов пузыря до сброса */
 const MAX_PROMPTS = 3;
-
-/** Количество фото для сброса счётчика показов */
 const RESET_AFTER_PHOTOS = 10;
-
-/** Задержка перед проверкой скролла (мс) */
 const CHECK_DELAY = 800;
-
-/** Таймер показа, если контент не скроллится (мс) */
 const NO_SCROLL_TIMER = 5000;
-
-/** Задержка после доскролливания до конца (мс) */
 const SCROLL_END_DELAY = 1500;
-
-/** Порог «доскроллено до конца» (px) */
 const SCROLL_THRESHOLD = 40;
-
-/** Автоскрытие пузыря (мс) */
 const AUTO_HIDE_DELAY = 10000;
-
-/** Длительность анимации (мс) */
 const BUBBLE_ANIMATION = 300;
-
-/** Дебаунс между показами (мс) */
 const SHOW_DEBOUNCE = 500;
-
-// ═══════════════════════════════════════
-// КЛЮЧИ LOCALSTORAGE
-// ═══════════════════════════════════════
 
 const STORAGE_KEY_SHOWN = 'vk_exhibition_prompt_shown';
 const STORAGE_KEY_PHOTO_COUNT = 'vk_exhibition_prompt_photo_count';
@@ -61,7 +43,8 @@ class FeedbackPrompt {
     this._scrollHandler = null;
     this._showing = false;
     this._lastShowTime = 0;
-
+    /** @type {number} Время запуска приложения */
+    this._startTime = Date.now();
     this._loadState();
   }
 
@@ -86,17 +69,10 @@ class FeedbackPrompt {
   }
 
   onPhotoOpened(photoId) {
-    console.log('FP: onPhotoOpened, id=', photoId, 'shown=', this._shown, 'photoCount=', this._photoCount);
-
     this._cancelAll();
 
     const photoScreen = document.getElementById('photo-screen');
-    console.log('FP: photoScreen hidden?', photoScreen?.classList.contains('hidden'));
-
-    if (!photoScreen || photoScreen.classList.contains('hidden')) {
-      console.log('FP: экран фото скрыт, выход');
-      return;
-    }
+    if (!photoScreen || photoScreen.classList.contains('hidden')) return;
 
     if (this._currentPhotoId !== photoId) {
       this._currentPhotoId = photoId;
@@ -110,10 +86,7 @@ class FeedbackPrompt {
       this._saveState();
     }
 
-    if (this._shown >= MAX_PROMPTS) {
-      console.log('FP: лимит показов исчерпан');
-      return;
-    }
+    if (this._shown >= MAX_PROMPTS) return;
 
     this._timer = setTimeout(() => this._checkScroll(), CHECK_DELAY);
   }
@@ -128,29 +101,25 @@ class FeedbackPrompt {
     if (this._showing || this._shown >= MAX_PROMPTS) return;
 
     const slideEl = document.querySelector('.slide-center');
-    console.log('FP: _checkScroll, slideEl found?', !!slideEl);
     if (!slideEl) return;
 
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (this._showing || this._shown >= MAX_PROMPTS) return;
+      if (this._showing || this._shown >= MAX_PROMPTS) return;
 
-        const canScroll = slideEl.scrollHeight > slideEl.clientHeight + 10;
-        console.log('FP: scrollH', slideEl.scrollHeight, 'clientH', slideEl.clientHeight, 'canScroll', canScroll);
+      const canScroll = slideEl.scrollHeight > slideEl.clientHeight + 10;
 
-        if (this._timer) clearTimeout(this._timer);
-        this._timer = null;
+      if (this._timer) clearTimeout(this._timer);
+      this._timer = null;
 
-        if (!canScroll) {
-          this._timer = setTimeout(() => this._show(), NO_SCROLL_TIMER);
-        } else {
-          if (this._scrollHandler) {
-            slideEl.removeEventListener('scroll', this._scrollHandler);
-          }
-          this._scrollHandler = () => this._onScroll();
-          slideEl.addEventListener('scroll', this._scrollHandler, { passive: true });
+      if (!canScroll) {
+        this._timer = setTimeout(() => this._show(), NO_SCROLL_TIMER);
+      } else {
+        if (this._scrollHandler) {
+          slideEl.removeEventListener('scroll', this._scrollHandler);
         }
-      });
+        this._scrollHandler = () => this._onScroll();
+        slideEl.addEventListener('scroll', this._scrollHandler, { passive: true });
+      }
     });
   }
 
@@ -159,10 +128,7 @@ class FeedbackPrompt {
     const slideEl = document.querySelector('.slide-center');
     if (!slideEl) return;
 
-    const distanceToBottom = slideEl.scrollHeight - slideEl.scrollTop - slideEl.clientHeight;
-    console.log('FP: distanceToBottom', distanceToBottom, 'threshold', SCROLL_THRESHOLD);
-
-    if (distanceToBottom <= SCROLL_THRESHOLD) {
+    if (slideEl.scrollHeight - slideEl.scrollTop - slideEl.clientHeight <= SCROLL_THRESHOLD) {
       if (this._scrollHandler) {
         slideEl.removeEventListener('scroll', this._scrollHandler);
         this._scrollHandler = null;
@@ -172,23 +138,33 @@ class FeedbackPrompt {
     }
   }
 
-  _show() {
+     _show() {
     const now = Date.now();
-    if (now - this._lastShowTime < SHOW_DEBOUNCE) return;
-    if (this._shown >= MAX_PROMPTS || this._showing) return;
-
-    this._showing = true;
-    this._shown++;
-    this._lastShowTime = now;
-    this._saveState();
-
-    if (this._timer) {
-      clearTimeout(this._timer);
-      this._timer = null;
+    console.log('FP: _show called, now=', now, 'lastShow=', this._lastShowTime, 'startTime=', this._startTime, 'diff=', now - this._startTime, 'INITIAL_DELAY=', INITIAL_DELAY);
+    
+    if (now - this._lastShowTime < SHOW_DEBOUNCE) {
+      console.log('FP: дебаунс, выход');
+      return;
     }
 
+    // Не показываем раньше чем через INITIAL_DELAY после старта
+    if (now - this._startTime < INITIAL_DELAY) {
+      console.log('FP: ещё не прошло INITIAL_DELAY, ждём');
+      // Запускаем повторную проверку когда таймаут истечёт
+      const remaining = INITIAL_DELAY - (now - this._startTime);
+      if (this._timer) clearTimeout(this._timer);
+      this._timer = setTimeout(() => this._show(), remaining + 500);
+      return;
+    }
+
+    if (this._shown >= MAX_PROMPTS || this._showing) {
+      console.log('FP: лимит показов или уже показываем, выход');
+      return;
+    }
+
+    console.log('FP: показываем пузырь');
+
     const message = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
-    console.log('FP: показываем пузырь:', message);
 
     this._hideBubble(true);
 

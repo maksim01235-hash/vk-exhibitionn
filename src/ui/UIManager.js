@@ -362,28 +362,31 @@ class UIManager {
    * Анимированное закрытие экрана обратной связи.
    */
   _animateCloseFeedback(screen) {
+    // Показываем целевой экран сразу
+    if (this._screenBeforeFeedback === 'photo') {
+      this._currentScreen = 'photo';
+      this._galleryScreen.classList.add('hidden');
+      this._photoScreen.classList.remove('hidden');
+      this._qrScreen.classList.add('hidden');
+      this._setFeedbackBtnShifted(true);
+      this._photoView.resetSwipe();
+    } else {
+      this.showGallery();
+      // showGallery скрывает feedbackScreen — возвращаем для анимации
+      screen.classList.remove('hidden');
+    }
+
+    // Кнопку показываем сразу
+    const fb = document.getElementById('feedback-btn');
+    if (fb) fb.classList.remove('hidden');
+
+    this._resetFeedbackForm();
+
+    // Анимация закрытия поверх
     screen.style.animation = `feedbackSlideDown ${FEEDBACK_CLOSE_DURATION}ms ease forwards`;
     screen.addEventListener('animationend', () => {
       screen.classList.add('hidden');
       screen.style.animation = '';
-
-      // Показываем кнопку обратной связи
-      const fb = document.getElementById('feedback-btn');
-      if (fb) fb.classList.remove('hidden');
-
-      this._resetFeedbackForm();
-
-      // Возвращаемся на экран, с которого пришли
-        if (this._screenBeforeFeedback === 'photo') {
-          this._currentScreen = 'photo';
-          this._galleryScreen.classList.add('hidden');
-          this._photoScreen.classList.remove('hidden');
-          this._qrScreen.classList.add('hidden');
-          this._setFeedbackBtnShifted(true);
-          this._photoView.resetSwipe();  // ← добавить
-        } else {
-        this.showGallery();
-      }
     }, { once: true });
   }
 
