@@ -57,8 +57,8 @@ class GalleryView {
       this._initialized = true;
     }
 
-    // Первый приоритетный загруз
-    this._prioritizeLoad(photos);
+    // Отложенная приоритетная загрузка — не блокируем рендер
+    setTimeout(() => this._prioritizeLoad(photos), 100);
   }
 
   /**

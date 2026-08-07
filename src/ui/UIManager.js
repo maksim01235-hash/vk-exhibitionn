@@ -121,11 +121,7 @@ class UIManager {
     document.getElementById('scan-btn-gallery').addEventListener('click', () => this.showQR());
     document.getElementById('scan-btn-photo').addEventListener('click', () => this.showQR());
     document.getElementById('back-to-gallery-btn').addEventListener('click', () => this.showGallery());
-        document.getElementById('close-qr-btn').addEventListener('click', () => {
-      if (this._currentScreen === 'qr') {
-        this._closeQR();
-      }
-    });
+    document.getElementById('close-qr-btn').addEventListener('click', () => this._goBack());
     // Кнопка обратной связи
     const feedbackBtn = document.getElementById('feedback-btn');
     if (feedbackBtn) {
@@ -236,41 +232,20 @@ class UIManager {
     this._photoView.resetSwipe();
     this._setFeedbackBtnShifted(false);
   }
-   _closeQR() {
-    const qrScreen = this._qrScreen;
 
-    // Показываем целевой экран сразу, до анимации
-    if (this._screenBeforeQR === 'photo') {
-      this._currentScreen = 'photo';
-      this._galleryScreen.classList.add('hidden');
-      this._photoScreen.classList.remove('hidden');
-      this._qrScreen.classList.add('hidden');
-      this._setFeedbackBtnShifted(true);
-    } else {
-      this.showGallery();
-      // showGallery скрывает qrScreen, возвращаем видимость для анимации
-      this._qrScreen.classList.remove('hidden');
-    }
-
-    this._qrScanner.stop();
-
-    // Запускаем анимацию закрытия поверх уже видимого экрана
-    qrScreen.classList.add('closing');
-
-    const onEnd = () => {
-      qrScreen.removeEventListener('animationend', onEnd);
-      qrScreen.classList.add('hidden');
-      qrScreen.classList.remove('closing');
-    };
-
-    qrScreen.addEventListener('animationend', onEnd);
-  }
   /**
    * Вернуться назад (из QR-сканера или фото — в галерею).
    */
   _goBack() {
     if (this._currentScreen === 'qr') {
-      this._closeQR();
+      this._qrScanner.stop();
+      this._qrScreen.classList.add('hidden');
+
+      if (this._screenBeforeQR === 'photo') {
+        this.showPhoto();
+      } else {
+        this.showGallery();
+      }
     } else if (this._currentScreen === 'photo') {
       this.showGallery();
     }
