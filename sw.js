@@ -22,25 +22,42 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 /** Статические файлы для предкеширования */
 const STATIC_ASSETS = [
+  // HTML
   '/',
   '/index.html',
+
+  // CSS
   '/styles/main.css',
+
+  // JS — ядро
   '/src/app.js',
   '/src/config.js',
+
+  // JS — core
   '/src/core/EventBus.js',
   '/src/core/Store.js',
   '/src/core/Router.js',
+
+  // JS — data
   '/src/data/DataLayer.js',
+
+  // JS — ui
   '/src/ui/UIManager.js',
   '/src/ui/GalleryView.js',
   '/src/ui/PhotoView.js',
   '/src/ui/InfoPanel.js',
   '/src/ui/SwipeManager.js',
   '/src/ui/QRScanner.js',
+
+  // JS — utils
   '/src/utils/markdown.js',
   '/src/utils/ImagePreloader.js',
   '/src/utils/FeedbackPrompt.js',
+
+  // Статика
   '/assets/placeholder.jpg',
+
+  // CDN-зависимости
   'https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js',
   'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
@@ -110,7 +127,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(event.request)) // Офлайн — отдаём кеш
     );
     return;
   }
@@ -156,13 +173,14 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
+        // Отдаём из кеша, а в фоне обновляем
         fetch(event.request)
           .then((response) => {
             if (isCacheable(response)) {
               caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
             }
           })
-          .catch(() => {});
+          .catch(() => {}); // Сеть недоступна — ничего не делаем
         return cachedResponse;
       }
 

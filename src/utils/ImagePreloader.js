@@ -10,7 +10,10 @@ const BACKGROUND_DELAY = 500;
 
 class ImagePreloader {
   constructor() {
+    /** @type {Map<string, Promise>} Активные загрузки (ключ — URL) */
     this._pending = new Map();
+
+    /** @type {Set<string>} Множество уже загруженных URL */
     this._loaded = new Set();
     this._storageKey = STORAGE_KEY;
     this._activeCount = 0;
@@ -36,11 +39,23 @@ class ImagePreloader {
     } catch (e) {}
   }
 
+  /**
+   * Предзагрузить одно изображение.
+   * Если URL уже загружен или в процессе — возвращает существующий промис.
+   * 
+   * @param {string} url — URL изображения
+   * @returns {Promise<string|null>} url если загружено, null если ошибка
+   */
   preload(url) {
     if (!url) return Promise.resolve(null);
+
+    // Уже загружено
     if (this._loaded.has(url)) return Promise.resolve(url);
+
+    // Уже в процессе загрузки — возвращаем существующий промис
     if (this._pending.has(url)) return this._pending.get(url);
 
+    // Новая загрузка
     const promise = new Promise((resolve) => {
       const load = () => {
         this._activeCount++;
@@ -84,14 +99,29 @@ class ImagePreloader {
     );
   }
 
+  /**
+   * Предзагрузка с приоритетом.
+   * Срочные загружаются немедленно, фоновые — с задержкой.
+   * 
+   * @param {string[]} urgentUrls — срочные URL
+   * @param {string[]} [backgroundUrls=[]] — фоновые URL
+   * @returns {Promise} разрешается когда срочные загружены
+   */
   async preloadWithPriority(urgentUrls, backgroundUrls = []) {
     const urgentPromise = this.preloadAll(urgentUrls);
+
     if (backgroundUrls.length > 0) {
       setTimeout(() => this.preloadAll(backgroundUrls), BACKGROUND_DELAY);
     }
+
     return urgentPromise;
   }
 
+  /**
+   * Проверить, загружен ли URL.
+   * @param {string} url
+   * @returns {boolean}
+   */
   isLoaded(url) {
     return this._loaded.has(url);
   }
