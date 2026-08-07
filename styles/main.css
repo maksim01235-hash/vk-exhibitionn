@@ -324,13 +324,26 @@ body {
   z-index: 2;
   overflow: hidden;
 }
+
 .slide .photo-image-wrapper img {
   display: block;
   width: 100%;
   height: auto;
   max-height: 55vh;
   object-fit: contain;
+}
+
+#photo-image {
+  position: relative;
+  z-index: 2;
   transition: opacity 0.4s ease;
+}
+
+#photo-image-full {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
 }
 
 .slide .photo-image-wrapper.loading-full::after {
