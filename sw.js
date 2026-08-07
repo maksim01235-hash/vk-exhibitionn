@@ -1,6 +1,26 @@
-const CACHE_NAME = 'vk-exhibition-v2';
+/**
+ * Service Worker — офлайн-кеширование приложения «Выставка».
+ * 
+ * Стратегии:
+ *   - Статические файлы: кешируются при установке
+ *   - Google Sheets / EmailJS: сеть → кеш (при ошибке — кеш)
+ *   - Изображения: кеш → сеть (мгновенная отдача из кеша, фоновое обновление)
+ *   - Всё остальное: кеш → сеть → фоновое обновление кеша
+ * 
+ * Чтобы сбросить кеш при обновлении — увеличьте CACHE_VERSION.
+ */
+
+// ═══════════════════════════════════════
+// НАСТРОЙКИ
+// ═══════════════════════════════════════
+
+/** Версия кеша — менять при обновлении статики */
+const CACHE_NAME = 'vk-exhibition-v3';
+
+/** Максимальный размер кешируемого изображения (10 MB) */
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
+/** Статические файлы для предкеширования */
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -28,33 +48,58 @@ const STATIC_ASSETS = [
   'https://unpkg.com/lucide@latest',
 ];
 
+// ═══════════════════════════════════════
+// УТИЛИТЫ
+// ═══════════════════════════════════════
+
 function isCacheable(response) {
   return response && response.ok && response.status === 200;
 }
 
+// ═══════════════════════════════════════
+// УСТАНОВКА
+// ═══════════════════════════════════════
+
 self.addEventListener('install', (event) => {
+  console.log('SW: установка...');
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
+      console.log('SW: кеширую статику...');
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.log('SW: не все ассеты закешированы, продолжаем', err);
+        console.warn('SW: не все ассеты закешированы:', err.message);
       });
     })
   );
 });
 
+// ═══════════════════════════════════════
+// АКТИВАЦИЯ
+// ═══════════════════════════════════════
+
 self.addEventListener('activate', (event) => {
+  console.log('SW: активация...');
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => {
+            console.log('SW: удаляю старый кеш:', key);
+            return caches.delete(key);
+          })
       );
     })
   );
 });
 
+// ═══════════════════════════════════════
+// ПЕРЕХВАТ ЗАПРОСОВ
+// ═══════════════════════════════════════
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // ── Google Sheets / EmailJS: сеть → кеш ──
   if (url.hostname === 'docs.google.com' || url.hostname === 'api.emailjs.com') {
     event.respondWith(
       fetch(event.request)
@@ -70,26 +115,44 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // ── Изображения: кеш → сеть (фон) ──
   if (event.request.destination === 'image') {
     event.respondWith(
       caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        
-        return fetch(event.request).then((response) => {
-          if (isCacheable(response)) {
-            const contentLength = response.headers.get('content-length');
-            if (!contentLength || parseInt(contentLength) <= MAX_IMAGE_SIZE) {
-              const cloned = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+        if (cached) {
+          // Отдаём из кеша мгновенно, в фоне обновляем
+          fetch(event.request)
+            .then((response) => {
+              if (isCacheable(response)) {
+                const contentLength = response.headers.get('content-length');
+                if (!contentLength || parseInt(contentLength) <= MAX_IMAGE_SIZE) {
+                  caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
+                }
+              }
+            })
+            .catch(() => {});
+          return cached;
+        }
+
+        // В кеше нет — грузим из сети и кешируем
+        return fetch(event.request)
+          .then((response) => {
+            if (isCacheable(response)) {
+              const contentLength = response.headers.get('content-length');
+              if (!contentLength || parseInt(contentLength) <= MAX_IMAGE_SIZE) {
+                const cloned = response.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+              }
             }
-          }
-          return response;
-        }).catch(() => cached || caches.match('/assets/placeholder.jpg'));
+            return response;
+          })
+          .catch(() => caches.match('/assets/placeholder.jpg'));
       })
     );
     return;
   }
 
+  // ── Всё остальное: кеш → сеть → фон ──
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -102,6 +165,7 @@ self.addEventListener('fetch', (event) => {
           .catch(() => {});
         return cachedResponse;
       }
+
       return fetch(event.request).then((response) => {
         if (isCacheable(response)) {
           const cloned = response.clone();

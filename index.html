@@ -23,21 +23,30 @@
       </div>
     </div>
 
-    <!-- Экран фотографии -->
+    <!-- Экран фотографии (слайдер) -->
     <div id="photo-screen" class="screen hidden">
-      <div class="photo-container">
-        <div id="photo-image-wrapper" class="photo-image-wrapper">
-          <img id="photo-image" src="" alt="" />
+      <div class="slides-track">
+        <div class="slide slide-left">
+          <div class="slide-content"></div>
         </div>
-        <div id="photo-info" class="photo-info">
-          <div id="info-content"></div>
+        <div class="slide slide-center">
+          <div class="slide-content">
+            <div class="photo-image-wrapper">
+              <img id="photo-image" src="" alt="" />
+            </div>
+            <div class="photo-info">
+              <div id="info-content"></div>
+            </div>
+          </div>
+        </div>
+        <div class="slide slide-right">
+          <div class="slide-content"></div>
         </div>
       </div>
       <div class="photo-toolbar">
-        <button id="back-to-gallery-btn" class="icon-btn" title="В каталог">
+        <button id="back-to-gallery-btn" class="icon-btn" title="Назад">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+            <polyline points="15 18 9 12 15 6"/>
           </svg>
         </button>
         <button id="scan-btn-photo" class="icon-btn scan-btn" title="Сканер QR-кода">
@@ -50,9 +59,9 @@
     <!-- Экран сканера QR -->
     <div id="qr-screen" class="screen hidden">
       <div class="qr-header">
-        <button id="close-qr-btn" class="icon-btn" title="Закрыть">
+        <button id="close-qr-btn" class="icon-btn" title="Назад">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            <polyline points="15 18 9 12 15 6"/>
           </svg>
         </button>
         <h2>Наведите на QR-код</h2>
