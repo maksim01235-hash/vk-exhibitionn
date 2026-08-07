@@ -1,17 +1,3 @@
-/**
- * GalleryView — главный экран: сетка превью фотографий.
- * 
- * Отвечает за:
- *   - Рендер сетки карточек с превью, названиями и авторами
- *   - Фоновую предзагрузку всех превью (один раз за сессию)
- *   - Клик по карточке → переход на экран фото
- * 
- * При расширении можно добавить:
- *   - Виртуальный скролл для сотен фото
- *   - Группировку по категориям (вкладки/секции)
- *   - Режимы отображения: сетка / список / лента
- */
-
 import Store from '../core/Store.js';
 import EventBus from '../core/EventBus.js';
 import ImagePreloader from '../utils/ImagePreloader.js';
@@ -21,41 +7,33 @@ import { renderMarkdown } from '../utils/markdown.js';
 // КОНСТАНТЫ
 // ═══════════════════════════════════════
 
-/** Количество превью, загружаемых одновременно (пачка) */
-const PRELOAD_BATCH_SIZE = 2;
+/** Количество видимых фото для немедленной загрузки */
+const VISIBLE_COUNT = 6;
 
-/** Задержка между пачками предзагрузки (мс) */
-const PRELOAD_BATCH_DELAY = 200;
+/** Количество фото для загрузки вблизи видимой области (в каждую сторону) */
+const NEARBY_COUNT = 4;
 
-/** Заглушка, если у фото нет ни preview, ни full */
-const PLACEHOLDER_URL = 'assets/placeholder.jpg';
+/** Порог «близости» в пикселях (фото в этой зоне считаются nearby) */
+const NEARBY_THRESHOLD = 600;
+
+/** Задержка между пачками загрузки (мс) */
+const BATCH_DELAY = 200;
 
 class GalleryView {
   constructor() {
-    /** @type {HTMLElement} Контейнер сетки */
     this._grid = document.getElementById('gallery-grid');
-
-    /** @type {HTMLElement} Заглушка «Фотографии не найдены» */
     this._empty = document.getElementById('gallery-empty');
-
-    /** Флаг: предзагрузка всех превью уже запущена */
-    this._allPreviewsLoaded = false;
+    this._initialized = false;
+    this._loadedIndices = new Set();
+    this._preloadQueue = [];
+    this._preloadTimer = null;
   }
 
-  // ═══════════════════════════════════════
-  // ПУБЛИЧНЫЙ API
-  // ═══════════════════════════════════════
-
-  /**
-   * Отрисовать сетку карточек.
-   * При первом вызове запускает фоновую предзагрузку всех превью.
-   */
   render() {
     if (!this._grid || !this._empty) return;
-
+    
     const photos = Store.getAllPhotos();
-
-    // Нет фото — показываем заглушку
+    
     if (photos.length === 0) {
       this._grid.innerHTML = '';
       this._grid.classList.add('hidden');
@@ -66,64 +44,100 @@ class GalleryView {
     this._empty.classList.add('hidden');
     this._grid.classList.remove('hidden');
 
-    // Рендер карточек
     this._grid.innerHTML = photos.map(photo => this._renderCard(photo)).join('');
 
-    // Навешиваем обработчики клика
     this._grid.querySelectorAll('.gallery-card').forEach(card => {
       card.addEventListener('click', () => {
         EventBus.emit('router:openPhoto', card.dataset.photoId);
       });
     });
 
-    // Фоновая предзагрузка всех превью (только один раз)
-    if (!this._allPreviewsLoaded) {
-      this._allPreviewsLoaded = true;
-      const previewUrls = photos
-        .map(p => p.imagePreviewUrl || p.imageUrl)
-        .filter(Boolean);
-      this._preloadInBatches(previewUrls, PRELOAD_BATCH_SIZE, PRELOAD_BATCH_DELAY);
+    if (!this._initialized) {
+      this._grid.addEventListener('scroll', () => this._prioritizeLoad(photos), { passive: true });
+      this._initialized = true;
+    }
+
+    // Первый приоритетный загруз
+    this._prioritizeLoad(photos);
+  }
+
+  /**
+   * Приоритетная загрузка: видимые → близкие → дальние.
+   */
+  _prioritizeLoad(photos) {
+    const gridRect = this._grid.getBoundingClientRect();
+    const cards = this._grid.querySelectorAll('.gallery-card');
+    const total = photos.length;
+
+    const visible = [];
+    const nearby = [];
+    const far = [];
+
+    cards.forEach((card, index) => {
+      if (this._loadedIndices.has(index)) return;
+
+      const rect = card.getBoundingClientRect();
+      const cardCenter = rect.top + rect.height / 2;
+      const gridCenter = gridRect.top + gridRect.height / 2;
+      const distance = Math.abs(cardCenter - gridCenter);
+
+      if (distance < gridRect.height / 2 + 50) {
+        // Видимо или почти видимо
+        visible.push(index);
+      } else if (distance < gridRect.height / 2 + NEARBY_THRESHOLD) {
+        // Близко к видимой области
+        nearby.push(index);
+      } else {
+        // Далеко
+        far.push(index);
+      }
+    });
+
+    // Строим очередь: видимые → близкие → дальние
+    const queue = [
+      ...visible.slice(0, VISIBLE_COUNT),
+      ...nearby.slice(0, NEARBY_COUNT * 2),
+      ...far,
+    ];
+
+    // Ограничиваем общее количество за раз
+    const toLoad = queue.slice(0, VISIBLE_COUNT + NEARBY_COUNT * 2 + 10);
+
+    toLoad.forEach(index => this._loadedIndices.add(index));
+
+    const urls = toLoad
+      .map(i => photos[i])
+      .filter(Boolean)
+      .map(p => p.imagePreviewUrl || p.imageUrl)
+      .filter(Boolean);
+
+    if (urls.length > 0) {
+      this._preloadInBatches(urls);
     }
   }
 
-  // ═══════════════════════════════════════
-  // ПРЕДЗАГРУЗКА
-  // ═══════════════════════════════════════
-
   /**
-   * Загрузить массив URL пачками с задержкой.
-   * Не нагружает сеть — грузит по 2 изображения каждые 200 мс.
-   * 
-   * @param {string[]} urls
-   * @param {number} batchSize — размер пачки
-   * @param {number} delayMs — задержка между пачками (мс)
+   * Загрузить URL пачками.
    */
-  _preloadInBatches(urls, batchSize, delayMs) {
+  _preloadInBatches(urls) {
+    if (urls.length === 0) return;
+
     let i = 0;
+    const batchSize = 2;
+
     const loadBatch = () => {
       const batch = urls.slice(i, i + batchSize);
       if (batch.length === 0) return;
       ImagePreloader.preloadAll(batch);
       i += batchSize;
-      setTimeout(loadBatch, delayMs);
+      setTimeout(loadBatch, BATCH_DELAY);
     };
+
     loadBatch();
   }
 
-  // ═══════════════════════════════════════
-  // РЕНДЕР КАРТОЧКИ
-  // ═══════════════════════════════════════
-
-  /**
-   * HTML одной карточки.
-   * Использует imagePreviewUrl, если есть, иначе imageUrl, иначе плейсхолдер.
-   * Название и автор проходят через Markdown-рендер (можно использовать **жирный**).
-   * 
-   * @param {Object} photo
-   * @returns {string} HTML-строка
-   */
   _renderCard(photo) {
-    const imgSrc = photo.imagePreviewUrl || photo.imageUrl || PLACEHOLDER_URL;
+    const imgSrc = photo.imagePreviewUrl || photo.imageUrl || 'assets/placeholder.jpg';
     return `
       <div class="gallery-card loaded" data-photo-id="${photo.id}">
         <div class="gallery-card-image">
@@ -137,11 +151,6 @@ class GalleryView {
     `;
   }
 
-  /**
-   * Экранировать HTML-сущности в строке.
-   * @param {string} str
-   * @returns {string}
-   */
   _escape(str) {
     const div = document.createElement('div');
     div.textContent = str;
