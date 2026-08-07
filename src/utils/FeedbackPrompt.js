@@ -37,7 +37,7 @@
  * 600 000 мс = 10 минут.
  * Установи 0 для отключения задержки.
  */
-const INITIAL_DELAY = 600000;
+const INITIAL_DELAY = 60000;
 
 /**
  * Фразы для пузыря.
@@ -84,34 +84,26 @@ const SCROLL_DEBOUNCE = 100;
 // КЛЮЧИ LOCALSTORAGE
 // ═══════════════════════════════════════
 
-/** Сколько раз пузырь уже показан с последнего сброса */
+const STORAGE_KEY_START_TIME = 'vk_exhibition_prompt_start_time';
 const STORAGE_KEY_SHOWN = 'vk_exhibition_prompt_shown';
-
-/** Сколько фото просмотрено с последнего сброса */
 const STORAGE_KEY_PHOTO_COUNT = 'vk_exhibition_prompt_photo_count';
 
 class FeedbackPrompt {
   constructor() {
-    // Счётчики
     this._shown = 0;
     this._photoCount = 0;
     this._currentPhotoId = null;
 
-    // Таймеры
     this._timer = null;
     this._hideTimer = null;
     this._scrollDebounceTimer = null;
 
-    // DOM
     this._bubble = null;
-
-    // Обработчики
     this._scrollHandler = null;
 
-    // Состояние
     this._showing = false;
     this._lastShowTime = 0;
-    this._startTime = Date.now();
+    this._startTime = this._loadStartTime();
 
     this._loadState();
   }
@@ -119,6 +111,24 @@ class FeedbackPrompt {
   // ═══════════════════════════════════════
   // СОСТОЯНИЕ (localStorage)
   // ═══════════════════════════════════════
+
+  _loadStartTime() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_START_TIME);
+      if (saved) {
+        return parseInt(saved);
+      }
+    } catch (e) {}
+    const now = Date.now();
+    this._saveStartTime(now);
+    return now;
+  }
+
+  _saveStartTime(time) {
+    try {
+      localStorage.setItem(STORAGE_KEY_START_TIME, time.toString());
+    } catch (e) {}
+  }
 
   _loadState() {
     try {
@@ -144,10 +154,6 @@ class FeedbackPrompt {
   // ПУБЛИЧНЫЙ API
   // ═══════════════════════════════════════
 
-  /**
-   * Вызвать при открытии фото.
-   * @param {string} photoId — ID открытого фото
-   */
   onPhotoOpened(photoId) {
     this._cancelAll();
 
@@ -171,10 +177,6 @@ class FeedbackPrompt {
     this._timer = setTimeout(() => this._checkScroll(), CHECK_DELAY);
   }
 
-  /**
-   * Принудительно скрыть пузырь.
-   * @param {boolean} [instant=false] — true = мгновенно, false = с анимацией
-   */
   cancel(instant = false) {
     this._cancelAll(instant);
   }
@@ -183,7 +185,6 @@ class FeedbackPrompt {
   // ЛОГИКА ПОКАЗА
   // ═══════════════════════════════════════
 
-  /** Проверить, можно ли скроллить описание */
   _checkScroll() {
     const photoScreen = document.getElementById('photo-screen');
     if (!photoScreen || photoScreen.classList.contains('hidden')) return;
@@ -201,10 +202,8 @@ class FeedbackPrompt {
       this._timer = null;
 
       if (!canScroll) {
-        // Скроллить нечего — таймер
         this._timer = setTimeout(() => this._show(), NO_SCROLL_TIMER);
       } else {
-        // Вешаем слушатель скролла с дебаунсом
         if (this._scrollHandler) {
           slideEl.removeEventListener('scroll', this._scrollHandler);
         }
@@ -217,7 +216,6 @@ class FeedbackPrompt {
     });
   }
 
-  /** Вызывается при скролле (с дебаунсом) */
   _onScroll() {
     if (this._showing) return;
     const slideEl = document.querySelector('.slide-center');
@@ -233,14 +231,11 @@ class FeedbackPrompt {
     }
   }
 
-  /** Показать пузырь */
   _show() {
     const now = Date.now();
 
-    // Дебаунс между показами
     if (now - this._lastShowTime < SHOW_DEBOUNCE) return;
 
-    // Не показываем раньше INITIAL_DELAY
     if (now - this._startTime < INITIAL_DELAY) {
       const remaining = INITIAL_DELAY - (now - this._startTime);
       if (this._timer) clearTimeout(this._timer);
@@ -262,10 +257,8 @@ class FeedbackPrompt {
 
     const message = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
 
-    // Удаляем старый пузырь если есть
     this._hideBubble(true);
 
-    // Создаём DOM пузыря
     const bubble = document.createElement('div');
     bubble.className = 'feedback-bubble';
     bubble.innerHTML = `
@@ -280,12 +273,10 @@ class FeedbackPrompt {
     document.getElementById('app').appendChild(bubble);
     this._bubble = bubble;
 
-    // Анимация появления
     requestAnimationFrame(() => {
       bubble.classList.add('visible');
     });
 
-    // Клик по пузырю → форма обратной связи
     bubble.addEventListener('click', (e) => {
       if (!e.target.classList.contains('feedback-bubble-close')) {
         this._cancelAll(true);
@@ -293,24 +284,14 @@ class FeedbackPrompt {
       }
     });
 
-    // Крестик закрытия
     bubble.querySelector('.feedback-bubble-close').addEventListener('click', (e) => {
       e.stopPropagation();
       this._hideBubble();
     });
 
-    // Автоскрытие
     this._hideTimer = setTimeout(() => this._hideBubble(), AUTO_HIDE_DELAY);
   }
 
-  // ═══════════════════════════════════════
-  // УПРАВЛЕНИЕ ПУЗЫРЁМ
-  // ═══════════════════════════════════════
-
-  /**
-   * Скрыть пузырь.
-   * @param {boolean} [instant=false] — true = мгновенно, false = с анимацией
-   */
   _hideBubble(instant = false) {
     if (!this._bubble) return;
 
@@ -333,10 +314,6 @@ class FeedbackPrompt {
     }
   }
 
-  /**
-   * Полная отмена: таймеры, скролл, пузырь.
-   * @param {boolean} [instant=false]
-   */
   _cancelAll(instant = false) {
     if (this._timer) {
       clearTimeout(this._timer);
