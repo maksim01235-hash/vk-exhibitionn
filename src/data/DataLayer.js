@@ -80,7 +80,7 @@ class DataLayer {
    * @returns {Promise<Object[]>}
    */
   async _fetchFromSheet() {
-    const response = await fetch(CONFIG.SHEET_URL);
+    const response = await fetch(CONFIG.EXHIBITION.SHEET_URL);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
