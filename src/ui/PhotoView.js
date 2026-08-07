@@ -1,42 +1,86 @@
-/**
- * PhotoView — экран фотографии (слайдер с тремя слайдами).
- * 
- * Два слоя изображений: preview (z:2) и full (z:1).
- * Preview показывается мгновенно. Full грузится в фоне.
- * Когда full загружен И анимация текста завершена — preview плавно затухает.
- */
-
 import Store from '../core/Store.js';
 import InfoPanel from './InfoPanel.js';
 import SwipeManager, { DIRECTION } from './SwipeManager.js';
 import ImagePreloader from '../utils/ImagePreloader.js';
 import FeedbackPrompt from '../utils/FeedbackPrompt.js';
-
 // ═══════════════════════════════════════
 // КОНСТАНТЫ
 // ═══════════════════════════════════════
 
+// ── Изображение ───────────────────────
+
+/** CSS-класс индикатора загрузки full-изображения (спинер) */
 const LOADING_CLASS = 'loading-full';
-
-const SWIPE_THRESHOLD = 80;
-const SWIPE_FOLLOW_RATIO = 1.0;
-const SWIPE_RETURN_DURATION = 300;
-const SWIPE_EXIT_DURATION = 250;
-
-const TRACK_LEFT = -200;
-const TRACK_CENTER = -100;
-const TRACK_RIGHT = 0;
-
-const PRELOAD_INTERVAL = 100;
-const CLOSE_NEIGHBORS = 2;
-const FAR_NEIGHBORS_START = 3;
-const FAR_NEIGHBORS_END = 5;
 
 /** Длительность фэйда preview → full (мс) */
 const FADE_DURATION = 400;
 
+// ── Свайп ─────────────────────────────
+
+/**
+ * Порог свайпа (px).
+ * Минимальное расстояние, которое нужно пройти пальцем,
+ * чтобы свайп был засчитан как смена слайда.
+ * Увеличьте для более «тугого» переключения.
+ */
+const SWIPE_THRESHOLD = 120;
+
+/**
+ * Множитель следования трека за пальцем.
+ * 1.0 — трек движется 1:1 с пальцем.
+ * 0.5 — трек движется вдвое медленнее (сопротивление).
+ * 1.5 — трек обгоняет палец (ускорение).
+ */
+const SWIPE_FOLLOW_RATIO = 1.0;
+
+/**
+ * Длительность возврата трека в центр, если свайп НЕ совершён (мс).
+ * Трек плавно возвращается на центральный слайд.
+ */
+const SWIPE_RETURN_DURATION = 300;
+
+/**
+ * Длительность ухода трека при успешном свайпе (мс).
+ * Трек уезжает к соседнему слайду.
+ */
+const SWIPE_EXIT_DURATION = 250;
+
+// ── Позиции трека ─────────────────────
+
+/**
+ * Позиции трека в vw (viewport width).
+ * Трек шириной 300vw, центральный слайд находится на -100vw.
+ *   TRACK_LEFT   = -200vw (левый слайд)
+ *   TRACK_CENTER = -100vw (центральный слайд)
+ *   TRACK_RIGHT  = 0     (правый слайд)
+ */
+const TRACK_LEFT = -200;
+const TRACK_CENTER = -100;
+const TRACK_RIGHT = 0;
+
+// ── Предзагрузка ──────────────────────
+
+/**
+ * Задержка между загрузками изображений в очереди (мс).
+ * Чтобы не нагружать сеть одновременными запросами.
+ */
+const PRELOAD_INTERVAL = 100;
+
+/** Сколько ближайших соседей грузить в первую очередь (в каждую сторону) */
+const CLOSE_NEIGHBORS = 2;
+
+/** Дальние соседи: начало диапазона (в каждую сторону) */
+const FAR_NEIGHBORS_START = 3;
+
+/** Дальние соседи: конец диапазона (в каждую сторону) */
+const FAR_NEIGHBORS_END = 5;
+
 class PhotoView {
   constructor() {
+
+    this._trackLocked = false;
+    this._trackStartPx = 0;
+
     this._track = document.querySelector('.slides-track');
     this._slideLeft = document.querySelector('.slide-left .slide-content');
     this._slideCenter = document.querySelector('.slide-center .slide-content');
@@ -59,7 +103,6 @@ class PhotoView {
     this._loadId = 0;
     this._settling = false;
 
-    // Для фэйда
     this._fullReady = false;
     this._textReady = false;
 
@@ -85,16 +128,13 @@ class PhotoView {
     const fullUrl = photo.imageUrl || previewUrl;
     const hasPreview = previewUrl !== fullUrl;
 
-    // Сброс флагов
     this._fullReady = false;
     this._textReady = false;
     this._centerImage.style.transition = 'none';
     this._centerImage.style.opacity = '1';
 
-    // Текст
     this._hideCenterText();
 
-    // Фото
     if (hasPreview) {
       this._centerImage.src = previewUrl;
       this._centerFullImage.src = '';
@@ -106,11 +146,9 @@ class PhotoView {
       this._centerWrapper.classList.remove(LOADING_CLASS);
     }
 
-    // Инфо
     if (!this._infoPanel) this._infoPanel = new InfoPanel();
     this._infoPanel.render(photo);
 
-    // Боковые
     this._updateSideSlides();
     this._buildNeighborsQueue();
     this._processQueue();
@@ -163,7 +201,7 @@ class PhotoView {
   }
 
   // ═══════════════════════════════════════
-  // ЗАГРУЗКА FULL
+  // ЗАГРУЗКА
   // ═══════════════════════════════════════
 
   _loadFull(url) {
@@ -231,24 +269,42 @@ class PhotoView {
   // ТРЕК
   // ═══════════════════════════════════════
 
+  /** Телепорт в центр */
   _resetTrackToCenter() {
     if (!this._track) return;
     this._track.style.transition = 'none';
     this._track.style.transform = `translateX(${TRACK_CENTER}vw)`;
   }
 
-  _setTrackOffset(px) {
-    if (!this._track) return;
-    const vw = window.innerWidth / 100;
-    this._track.style.transition = 'none';
-    this._track.style.transform = `translateX(${Math.round(TRACK_CENTER * vw + px)}px)`;
+  /**
+   * Получить РЕАЛЬНУЮ текущую позицию трека из computed styles (px).
+   */
+  _getTrackPosition() {
+    // Не используется для onMove, только для отладки
+    if (!this._track) return 0;
+    const style = getComputedStyle(this._track);
+    const matrix = new DOMMatrix(style.transform);
+    return matrix.m41;
   }
 
+  /**
+   * Установить смещение трека относительно ЕГО ТЕКУЩЕЙ позиции.
+   * Вызывается при движении пальца.
+   */
+  _setTrackOffset(px) {
+    if (!this._track) return;
+    this._track.style.transition = 'none';
+    this._track.style.transform = `translateX(${this._trackStartPx + px}px)`;
+  }
+  /**
+   * Анимировать трек к абсолютной позиции (vw).
+   */
   _animateTrackTo(targetVw, duration, callback) {
     if (!this._track) return;
     const targetPx = Math.round(targetVw * window.innerWidth / 100);
     this._track.style.transition = `transform ${duration}ms ease`;
     this._track.style.transform = `translateX(${targetPx}px)`;
+
     if (callback) {
       let fired = false;
       const onEnd = () => {
@@ -270,12 +326,21 @@ class PhotoView {
   _setupSwipeManager() {
     this._swipeManager = new SwipeManager(document.getElementById('photo-screen'), {
       threshold: SWIPE_THRESHOLD,
+
       onMove: (offsetX, offsetY, direction) => {
         if (this._settling) return;
         if (direction === DIRECTION.LEFT || direction === DIRECTION.RIGHT) {
+          // Запоминаем позицию трека один раз в начале жеста
+          if (!this._trackStartPx) {
+            this._track.style.transition = 'none';
+            const style = getComputedStyle(this._track);
+            const matrix = new DOMMatrix(style.transform);
+            this._trackStartPx = matrix.m41;
+          }
           this._setTrackOffset(offsetX * SWIPE_FOLLOW_RATIO);
         }
       },
+
       onSwipeLeft: () => {
         if (this._settling) return;
         this._settling = true;
@@ -285,6 +350,7 @@ class PhotoView {
           this._settling = false;
         });
       },
+
       onSwipeRight: () => {
         if (this._settling) return;
         this._settling = true;
@@ -294,8 +360,10 @@ class PhotoView {
           this._settling = false;
         });
       },
+
       onRelease: (direction) => {
-        if (this._settling) return;
+        this._trackStartPx = 0;
+        this._trackLocked = false;
         if (!direction) {
           this._settling = true;
           this._animateTrackTo(TRACK_CENTER, SWIPE_RETURN_DURATION, () => {

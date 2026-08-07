@@ -196,6 +196,11 @@ body {
   }
 }
 
+@keyframes cardFadeIn {
+  from { transform: translateY(20px); }
+  to   { transform: translateY(0); }
+}
+
 .gallery-card {
   cursor: pointer;
   position: relative;
@@ -206,17 +211,6 @@ body {
   border-radius: var(--radius-sm);
   transition: transform 0.2s, box-shadow 0.2s;
   animation: cardFadeIn 0.5s ease forwards;
-}
-
-@keyframes cardFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .gallery-card:active {
