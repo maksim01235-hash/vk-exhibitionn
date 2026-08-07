@@ -246,16 +246,17 @@ class PhotoView {
     this._track.style.transform = `translateX(${TRACK_CENTER}vw)`;
   }
 
-  _setTrackOffset(px) {
+   _setTrackOffset(px) {
     if (!this._track) return;
     const vw = window.innerWidth / 100;
+    const offset = Math.round(TRACK_CENTER * vw + px);
     this._track.style.transition = 'none';
-    this._track.style.transform = `translateX(${TRACK_CENTER * vw + px}px)`;
+    this._track.style.transform = `translateX(${offset}px)`;
   }
 
   _animateTrackTo(targetVw, duration, callback) {
     if (!this._track) return;
-    const targetPx = targetVw * window.innerWidth / 100;
+    const targetPx = Math.round(targetVw * window.innerWidth / 100);
     this._track.style.transition = `transform ${duration}ms ease`;
     this._track.style.transform = `translateX(${targetPx}px)`;
 

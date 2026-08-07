@@ -62,7 +62,7 @@ class SwipeManager {
     this._handleMouseUp = this._handleMouseUp.bind(this);
 
     element.addEventListener('touchstart', this._handleTouchStart, { passive: true });
-    element.addEventListener('touchmove', this._handleTouchMove, { passive: true });
+    element.addEventListener('touchmove', this._handleTouchMove, { passive: false });
     element.addEventListener('touchend', this._handleTouchEnd);
     element.addEventListener('touchcancel', this._handleTouchEnd);
     element.addEventListener('mousedown', this._handleMouseDown);
