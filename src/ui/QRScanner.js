@@ -73,35 +73,41 @@ class QRScanner {
 
     try {
       this._reader = new Html5Qrcode(READER_ID);
-      
-      // Получаем список камер
-      const cameras = await Html5Qrcode.getCameras();
-      
-      let cameraId = { facingMode: CAMERA_FACING };
-      
-      if (cameras && cameras.length > 0) {
-        // Ищем заднюю камеру с самым высоким разрешением (обычно основная)
-        const backCameras = cameras.filter(c => c.id.includes('back') || c.id.includes('rear') || c.id === '0');
-        if (backCameras.length > 0) {
-          // Берём камеру с самым длинным id (обычно основная) или первую
-          const mainCamera = backCameras.reduce((a, b) => 
-            (a.id.length >= b.id.length) ? a : b
-          );
-          cameraId = { deviceId: mainCamera.id };
-        }
-      }
-      
       this._isRunning = true;
 
-      await this._reader.start(
-        cameraId,
-        {
-          fps: SCAN_FPS,
-          qrbox: QRBOX_SIZE,
-        },
-        (decodedText) => this._onScanSuccess(decodedText),
-        () => {}
-      );
+      // Пробуем разные конфигурации камеры
+      const cameraConfigs = [
+        { facingMode: 'environment' },
+        { facingMode: { exact: 'environment' } },
+        {}, // без указания — что даст браузер
+      ];
+
+      let started = false;
+
+      for (const config of cameraConfigs) {
+        try {
+          await this._reader.start(
+            config,
+            {
+              fps: SCAN_FPS,
+              qrbox: QRBOX_SIZE,
+              aspectRatio: 1.0,
+            },
+            (decodedText) => this._onScanSuccess(decodedText),
+            () => {}
+          );
+          started = true;
+          break;
+        } catch (err) {
+          console.log('QRScanner: не удалось с конфигом', config, err.message);
+          // Пробуем следующий
+        }
+      }
+
+      if (!started) {
+        throw new Error('Ни одна конфигурация камеры не подошла');
+      }
+
     } catch (err) {
       console.log('QRScanner: камера недоступна:', err.message);
       this._isRunning = false;
