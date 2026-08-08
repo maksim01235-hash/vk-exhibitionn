@@ -86,6 +86,14 @@ class QRScanner {
       return;
     }
 
+    // Сначала полностью останавливаем предыдущий сканер
+    if (this._reader) {
+      try { await this._reader.stop(); } catch (e) {}
+      this._reader = null;
+    }
+    this._isRunning = false;
+    this._readerContainer.innerHTML = '';
+
     log('запуск...');
     log(`userAgent: ${navigator.userAgent.substring(0, 80)}`);
 
@@ -183,12 +191,22 @@ class QRScanner {
   stop() {
     log('остановка');
     cameraLogToBuffer('остановка');
+    
+    // Очищаем контейнер чтобы убрать видео
+    if (this._readerContainer) {
+      this._readerContainer.innerHTML = '';
+    }
+    
     if (this._reader && this._isRunning) {
       try {
-        this._reader.stop().catch(() => {});
+        this._reader.stop()
+          .then(() => { this._isRunning = false; })
+          .catch(() => { this._isRunning = false; });
       } catch (e) {
         log(`ошибка остановки: ${e.message}`, 'warn');
+        this._isRunning = false;
       }
+    } else {
       this._isRunning = false;
     }
   }

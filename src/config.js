@@ -100,7 +100,7 @@ SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwHJ2dg6pFCrOGU6VwwBC6zLlPc
 const TECH = {
   CACHE_TTL: 30,
   PHOTOS_PER_PAGE: 50,
-  SW_CACHE_VERSION: 'v7',
+  SW_CACHE_VERSION: 'v10',
 };
 
 // ═══════════════════════════════════════
