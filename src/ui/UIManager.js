@@ -1,15 +1,36 @@
 /**
  * UIManager — управление экранами приложения.
+ * 
+ * НАЗНАЧЕНИЕ:
+ *   Переключает экраны: галерея, фото (слайдер), QR-сканер, обратная связь.
+ *   Обрабатывает навигационные события от Router.
+ * 
+ * СХЕМА НАВИГАЦИИ:
+ *   Галерея ←→ Фото ←→ QR-сканер
+ *   Галерея ←→ Обратная связь
+ *   Фото      ←→ Обратная связь
+ *   QR-сканер ←→ Обратная связь
+ *   Галерея ←→ Фото (по ссылке /#id)
  */
-import { getCameraLogs } from './QRScanner.js';
+
 import Store from '../core/Store.js';
 import EventBus from '../core/EventBus.js';
 import GalleryView from './GalleryView.js';
 import PhotoView from './PhotoView.js';
-import QRScanner from './QRScanner.js';
+import QRScanner, { getCameraLogs } from './QRScanner.js';
 import FeedbackPrompt from '../utils/FeedbackPrompt.js';
 import CONFIG from '../config.js';
+import { createLogger } from '../utils/Logger.js';
+import { getLogs } from '../utils/Logger.js';
 
+// ═══════════════════════════════════════
+// КОНСТАНТЫ
+// ═══════════════════════════════════════
+
+/** Включить логирование */
+const DEBUG = true;
+
+/** ID экранов */
 const SCREENS = {
   gallery:  'gallery-screen',
   photo:    'photo-screen',
@@ -17,7 +38,14 @@ const SCREENS = {
   feedback: 'feedback-screen',
 };
 
+/** CSS-класс для смещения кнопки обратной связи на экране фото */
 const SHIFTED_CLASS = 'shifted';
+
+// ═══════════════════════════════════════
+// ЛОГГЕР
+// ═══════════════════════════════════════
+
+const log = createLogger('UIManager', DEBUG);
 
 class UIManager {
   constructor() {
@@ -35,19 +63,28 @@ class UIManager {
     this._pendingPhotoId = null;
     this._screenBeforeFeedback = null;
     this._screenBeforeQR = null;
+
+    log('синглтон создан');
   }
+
+  // ═══════════════════════════════════════
+  // ИНИЦИАЛИЗАЦИЯ
+  // ═══════════════════════════════════════
 
   init() {
     this._galleryView = new GalleryView();
     this._photoView = new PhotoView();
     this._qrScanner = new QRScanner();
+    log('компоненты созданы');
 
+    // Подписки на навигацию
     EventBus.on('router:openGallery', () => this.showGallery());
     EventBus.on('router:openQR', () => this.showQR());
 
     EventBus.on('router:openPhoto', (id) => {
       if (Store.getCount() === 0) {
         this._pendingPhotoId = id;
+        log(`фото #${id} отложено до загрузки данных`);
       } else if (!this._initialized || this._currentScreen !== 'photo') {
         this._pendingPhotoId = null;
         this.showPhoto(id);
@@ -57,6 +94,7 @@ class UIManager {
     EventBus.on('photos:loaded', () => this._onDataLoaded());
     EventBus.on('photos:error', () => this._onDataError());
 
+    // Кнопки
     document.getElementById('scan-btn-gallery').addEventListener('click', () => this.showQR());
     document.getElementById('scan-btn-photo').addEventListener('click', () => this.showQR());
     document.getElementById('back-to-gallery-btn').addEventListener('click', () => this.showGallery());
@@ -66,15 +104,23 @@ class UIManager {
     if (feedbackBtn) {
       feedbackBtn.addEventListener('click', () => this._openFeedback());
     }
+
+    log('инициализация завершена');
   }
+
+  // ═══════════════════════════════════════
+  // ДАННЫЕ
+  // ═══════════════════════════════════════
 
   _onDataLoaded() {
     this._hideLoading();
+    log('данные загружены, определяю экран');
 
     if (this._pendingPhotoId) {
       const id = this._pendingPhotoId;
       this._pendingPhotoId = null;
       this._initialized = true;
+      log(`отложенный переход к фото #${id}`);
       this.showPhoto(id);
       return;
     }
@@ -84,6 +130,7 @@ class UIManager {
       const id = hash.substring(1).replace(/^\//, '');
       if (id && Store.navigateToId(id)) {
         this._initialized = true;
+        log(`переход по хешу к фото #${id}`);
         this.showPhoto(id);
         return;
       }
@@ -97,13 +144,19 @@ class UIManager {
 
   _onDataError() {
     this._hideLoading();
+    log('ошибка загрузки данных', 'error');
     if (!this._initialized) {
       this._initialized = true;
       this.showGallery();
     }
   }
 
+  // ═══════════════════════════════════════
+  // НАВИГАЦИЯ
+  // ═══════════════════════════════════════
+
   showGallery() {
+    log('→ галерея');
     this._currentScreen = 'gallery';
     this._galleryScreen.classList.remove('hidden');
     this._photoScreen.classList.add('hidden');
@@ -111,7 +164,7 @@ class UIManager {
     this._hideFeedbackScreen();
     this._qrScanner.stop();
     this._photoView.resetSwipe();
-    this._photoView.reset(); // ← сброс состояния фото
+    this._photoView.reset();
     this._galleryView.render();
     this._setFeedbackBtnShifted(false);
     if (window.location.hash) {
@@ -121,6 +174,7 @@ class UIManager {
   }
 
   showPhoto(id) {
+    log(`→ фото #${id || 'текущее'}`);
     this._currentScreen = 'photo';
     this._galleryScreen.classList.add('hidden');
     this._photoScreen.classList.remove('hidden');
@@ -133,6 +187,7 @@ class UIManager {
   }
 
   showQR() {
+    log('→ QR-сканер');
     FeedbackPrompt.cancel(true);
 
     this._screenBeforeQR = this._currentScreen;
@@ -147,41 +202,37 @@ class UIManager {
   }
 
   _goBack() {
+    log(`назад из ${this._currentScreen}`);
     if (this._currentScreen === 'qr') {
       this._qrScanner.stop();
       this._qrScreen.classList.add('hidden');
-      // Явно показываем
       if (this._screenBeforeQR === 'photo') {
-        this._currentScreen = 'photo';
-        this._photoScreen.classList.remove('hidden');
-        this._galleryScreen.classList.add('hidden');
-        this._qrScreen.classList.add('hidden');
-        this._setFeedbackBtnShifted(true);
-        this._photoView.resetSwipe();
+        this.showPhoto();
       } else {
-        this._galleryScreen.classList.remove('hidden');
-        this._photoScreen.classList.add('hidden');
-        this._qrScreen.classList.add('hidden');
-        this._currentScreen = 'gallery';
-        this._setFeedbackBtnShifted(false);
-        this._galleryView.render();
+        this.showGallery();
       }
     } else if (this._currentScreen === 'photo') {
       this.showGallery();
     }
   }
 
+  // ═══════════════════════════════════════
+  // КНОПКА ОБРАТНОЙ СВЯЗИ
+  // ═══════════════════════════════════════
+
   _setFeedbackBtnShifted(shifted) {
     const fb = document.getElementById('feedback-btn');
     if (!fb) return;
-    if (shifted) {
-      fb.classList.add(SHIFTED_CLASS);
-    } else {
-      fb.classList.remove(SHIFTED_CLASS);
-    }
+    if (shifted) fb.classList.add(SHIFTED_CLASS);
+    else fb.classList.remove(SHIFTED_CLASS);
   }
 
+  // ═══════════════════════════════════════
+  // ОБРАТНАЯ СВЯЗЬ
+  // ═══════════════════════════════════════
+
   _openFeedback() {
+    log('→ обратная связь');
     FeedbackPrompt.cancel();
 
     const fb = document.getElementById('feedback-btn');
@@ -203,31 +254,6 @@ class UIManager {
 
     this._resetFeedbackForm();
     feedbackScreen.classList.remove('hidden');
-  }
-
-  _animateCloseQR() {
-    const qrScreen = this._qrScreen;
-    
-    // Показываем целевой экран сразу
-    if (this._screenBeforeQR === 'photo') {
-      this._currentScreen = 'photo';
-      this._galleryScreen.classList.add('hidden');
-      this._photoScreen.classList.remove('hidden');
-      this._qrScreen.classList.add('hidden');
-      this._setFeedbackBtnShifted(true);
-    } else {
-      this.showGallery();
-      this._qrScreen.classList.remove('hidden');
-    }
-
-    this._qrScanner.stop();
-
-    // Анимация закрытия поверх
-    qrScreen.classList.add('closing');
-    qrScreen.addEventListener('animationend', () => {
-      qrScreen.classList.add('hidden');
-      qrScreen.classList.remove('closing');
-    }, { once: true });
   }
 
   _createFeedbackScreen() {
@@ -269,6 +295,7 @@ class UIManager {
     document.getElementById('app').appendChild(screen);
 
     document.getElementById('close-feedback-btn').addEventListener('click', () => {
+      log('закрытие обратной связи');
       screen.classList.add('hidden');
 
       const fb = document.getElementById('feedback-btn');
@@ -309,6 +336,7 @@ class UIManager {
   }
 
   _sendFeedback() {
+    log('отправка обратной связи...');
     const form = document.getElementById('feedback-form');
     const submitBtn = document.getElementById('feedback-submit');
     const errorEl = document.getElementById('feedback-error');
@@ -328,27 +356,41 @@ class UIManager {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                     emailInput.classList.add('error');   hasError = true; }
     if (!message)  { messageInput.classList.add('error'); hasError = true; }
-    if (hasError) return;
+    if (hasError) {
+      log('валидация не пройдена', 'warn');
+      return;
+    }
 
     this._setSubmitLoading(submitBtn, true);
 
-    const cameraInfo = getCameraLogs() || 'QR-сканер не запускался';
+    // Собираем логи
+    let fullMessage = message;
+    const appLogs = getLogs();
+    const cameraLogs = getCameraLogs();
+
+    if (appLogs) {
+      fullMessage += '\n\n--- ЛОГИ ПРИЛОЖЕНИЯ ---\n' + appLogs;
+    }
+    if (cameraLogs) {
+      fullMessage += '\n\n--- ЛОГИ КАМЕРЫ ---\n' + cameraLogs;
+    }
 
     const templateParams = {
       name: name,
       reply_to: email,
-      message: message + '\n\n--- ЛОГИ КАМЕРЫ ---\n' + cameraInfo,
+      message: fullMessage,
       time: new Date().toLocaleString('ru-RU'),
     };
 
     emailjs.send(CONFIG.EMAILJS.SERVICE_ID, CONFIG.EMAILJS.TEMPLATE_ID, templateParams, CONFIG.EMAILJS.PUBLIC_KEY)
       .then(() => {
+        log('отправлено успешно');
         form.classList.add('hidden');
         errorEl.classList.add('hidden');
         document.getElementById('feedback-success').classList.remove('hidden');
       })
       .catch((err) => {
-        console.error('UIManager: ошибка отправки:', err);
+        log(`ошибка отправки: ${err.message}`, 'error');
         errorEl.classList.remove('hidden');
         this._setSubmitLoading(submitBtn, false);
       });

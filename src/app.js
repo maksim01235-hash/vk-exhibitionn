@@ -1,13 +1,13 @@
 /**
  * Точка входа приложения «Выставка».
  * 
- * Порядок инициализации:
+ * ПОРЯДОК ИНИЦИАЛИЗАЦИИ:
  *   1. Service Worker — кеширование статики для офлайн-доступа
  *   2. UIManager — создание экранов и подписка на события
  *   3. DataLayer — загрузка данных из Google Таблицы
  *   4. Router — определение начального экрана (хеш / QR)
  * 
- * При расширении можно добавить:
+ * ПРИ РАСШИРЕНИИ ДОБАВИТЬ:
  *   — Аналитику (отправка статистики просмотров)
  *   — Инициализацию VK Bridge для рекламы / покупок
  *   — Восстановление состояния после перезагрузки
@@ -17,67 +17,79 @@ import CONFIG from './config.js';
 import DataLayer from './data/DataLayer.js';
 import Router from './core/Router.js';
 import UIManager from './ui/UIManager.js';
+import { getLogs } from './utils/Logger.js';
 
 // ═══════════════════════════════════════
 // КОНСТАНТЫ
 // ═══════════════════════════════════════
 
 /**
- * Версия приложения.
- * Меняется при каждом деплое для сброса кеша Service Worker.
- * Отображается в консоли для отладки.
- * 
- * Формат: MAJOR.MINOR.PATCH
- *   MAJOR — крупные изменения (новая архитектура)
- *   MINOR — новый функционал
- *   PATCH — исправления
+ * Включить подробное логирование в консоль.
+ * true — логировать все этапы инициализации и ошибки.
+ * false — только критические ошибки.
  */
-const APP_VERSION = '2.2.16';
-
-/** Путь к файлу Service Worker */
-const SW_PATH = '/sw.js';
+const DEBUG = true;
 
 /**
- * Инициализировать приложение.
- * Вызывается при DOMContentLoaded (или сразу если DOM уже готов).
+ * Версия приложения.
+ * Менять при каждом деплое для сброса кеша Service Worker.
+ * Формат: MAJOR.MINOR.PATCH
  */
+const APP_VERSION = '2.3.0';
+
+/** Путь к Service Worker */
+const SW_PATH = './sw.js';
+
+// ═══════════════════════════════════════
+// ЛОГИРОВАНИЕ
+// ═══════════════════════════════════════
+
+function log(...args) { if (DEBUG) console.log('[App]', ...args); }
+function warn(...args) { if (DEBUG) console.warn('[App]', ...args); }
+
+// ═══════════════════════════════════════
+// ИНИЦИАЛИЗАЦИЯ
+// ═══════════════════════════════════════
+
 async function init() {
-  console.log(`Выставка v${APP_VERSION}: инициализация...`);
+  log(`v${APP_VERSION}: инициализация...`);
 
-  // 1. Service Worker — кеширование статики и изображений
-  await _registerServiceWorker();
+  // 1. Service Worker — кеширование статики
+  await registerSW();
 
-  // 2. UI — создание экранов, подписка на события навигации
+  // 2. UI — экраны, подписки на события
   UIManager.init();
+  log('UIManager инициализирован');
 
-  // 3. Данные — загрузка из Google Таблицы
+  // 3. Данные из Google Таблицы
   await DataLayer.load();
+  log('DataLayer загружен');
 
-  // 4. Роутер — определить начальный экран (хеш, QR, галерея)
+  // 4. Роутер — определить начальный экран
   await Router.init();
+  log('Router инициализирован');
 
-  console.log(`Выставка v${APP_VERSION}: готово`);
+  log(`v${APP_VERSION}: готово`);
 }
 
-/**
- * Зарегистрировать Service Worker.
- * Не блокирует запуск при ошибке — приложение работает и без SW.
- */
-async function _registerServiceWorker() {
+async function registerSW() {
   if (!('serviceWorker' in navigator)) {
-    console.log('SW: не поддерживается браузером');
+    warn('Service Worker не поддерживается браузером');
     return;
   }
 
   try {
-    const registration = await navigator.serviceWorker.register('./sw.js');
-    console.log('SW: зарегистрирован, scope =', registration.scope);
+    const registration = await navigator.serviceWorker.register(SW_PATH, { scope: './' });
+    log(`SW зарегистрирован, scope = ${registration.scope}`);
   } catch (e) {
-    console.warn('SW: не зарегистрирован —', e.message);
+    warn(`SW не зарегистрирован: ${e.message}`);
   }
 }
 
-// Запуск: ждём готовности DOM
+// ═══════════════════════════════════════
+// ЗАПУСК
+// ═══════════════════════════════════════
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {

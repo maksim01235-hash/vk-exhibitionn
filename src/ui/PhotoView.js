@@ -1,15 +1,35 @@
+/**
+ * PhotoView — экран фотографии (слайдер с тремя слайдами).
+ * 
+ * НАЗНАЧЕНИЕ:
+ *   Отображает фото в центре, текст выезжает из-под фото при открытии.
+ *   Поддерживает свайпы влево/вправо для перехода между фото.
+ *   Два слоя изображений: preview (z:2) и full (z:1).
+ * 
+ * КАК ЭТО РАБОТАЕТ:
+ *   - Открытие из галереи: preview + текст выезжает, full грузится в фоне, затем фэйд
+ *   - Свайп: трек двигается за пальцем, после завершения — центральный слайд
+ *     получает фото из бокового, боковые перестраиваются
+ *   - Высота враппера auto, фото само определяет размер через CSS
+ */
+
 import Store from '../core/Store.js';
 import InfoPanel from './InfoPanel.js';
 import SwipeManager, { DIRECTION } from './SwipeManager.js';
 import ImagePreloader from '../utils/ImagePreloader.js';
 import FeedbackPrompt from '../utils/FeedbackPrompt.js';
+import { createLogger } from '../utils/Logger.js';
+
 // ═══════════════════════════════════════
 // КОНСТАНТЫ
 // ═══════════════════════════════════════
 
+/** Включить логирование */
+const DEBUG = true;
+
 // ── Изображение ───────────────────────
 
-/** CSS-класс индикатора загрузки full-изображения (спинер) */
+/** CSS-класс индикатора загрузки full (спинер) */
 const LOADING_CLASS = 'loading-full';
 
 /** Длительность фэйда preview → full (мс) */
@@ -17,106 +37,96 @@ const FADE_DURATION = 400;
 
 // ── Свайп ─────────────────────────────
 
-/**
- * Порог свайпа (px).
- * Минимальное расстояние, которое нужно пройти пальцем,
- * чтобы свайп был засчитан как смена слайда.
- * Увеличьте для более «тугого» переключения.
- */
+/** Порог свайпа (px) — минимальное расстояние для смены слайда */
 const SWIPE_THRESHOLD = 90;
 
-/**
- * Множитель следования трека за пальцем.
- * 1.0 — трек движется 1:1 с пальцем.
- * 0.5 — трек движется вдвое медленнее (сопротивление).
- * 1.5 — трек обгоняет палец (ускорение).
- */
+/** Множитель следования трека за пальцем (1.0 = 1:1) */
 const SWIPE_FOLLOW_RATIO = 1.0;
 
-/**
- * Длительность возврата трека в центр, если свайп НЕ совершён (мс).
- * Трек плавно возвращается на центральный слайд.
- */
+/** Длительность возврата трека если свайп не совершён (мс) */
 const SWIPE_RETURN_DURATION = 300;
 
-/**
- * Длительность ухода трека при успешном свайпе (мс).
- * Трек уезжает к соседнему слайду.
- */
+/** Длительность ухода трека при успешном свайпе (мс) */
 const SWIPE_EXIT_DURATION = 250;
 
-// ── Позиции трека ─────────────────────
+// ── Позиции трека (vw) ────────────────
 
-/**
- * Позиции трека в vw (viewport width).
- * Трек шириной 300vw, центральный слайд находится на -100vw.
- *   TRACK_LEFT   = -200vw (левый слайд)
- *   TRACK_CENTER = -100vw (центральный слайд)
- *   TRACK_RIGHT  = 0     (правый слайд)
- */
 const TRACK_LEFT = -200;
 const TRACK_CENTER = -100;
 const TRACK_RIGHT = 0;
 
 // ── Предзагрузка ──────────────────────
 
-/**
- * Задержка между загрузками изображений в очереди (мс).
- * Чтобы не нагружать сеть одновременными запросами.
- */
+/** Задержка между загрузками в очереди (мс) */
 const PRELOAD_INTERVAL = 50;
 
-/** Сколько ближайших соседей грузить в первую очередь (в каждую сторону) */
+/** Ближайшие соседи (в каждую сторону) */
 const CLOSE_NEIGHBORS = 1;
 
-/** Дальние соседи: начало диапазона (в каждую сторону) */
+/** Дальние соседи: от */
 const FAR_NEIGHBORS_START = 2;
 
-/** Дальние соседи: конец диапазона (в каждую сторону) */
+/** Дальние соседи: до */
 const FAR_NEIGHBORS_END = 5;
+
+// ═══════════════════════════════════════
+// ЛОГГЕР
+// ═══════════════════════════════════════
+
+const log = createLogger('PhotoView', DEBUG);
 
 class PhotoView {
   constructor() {
-
-    this._trackLocked = false;
-    this._trackStartPx = 0;
-
+    // Трек и слайды
     this._track = document.querySelector('.slides-track');
     this._slideLeft = document.querySelector('.slide-left .slide-content');
     this._slideCenter = document.querySelector('.slide-center .slide-content');
     this._slideRight = document.querySelector('.slide-right .slide-content');
 
+    // Слои изображений
     this._centerWrapper = document.querySelector('.slide-center .photo-image-wrapper');
     this._centerImage = document.querySelector('#photo-image');
     this._centerFullImage = document.querySelector('#photo-image-full');
 
+    // Счётчик
     this._counterEl = document.getElementById('photo-counter');
 
+    // Индексы боковых слайдов
     this._prevSideIndex = -1;
     this._nextSideIndex = -1;
 
+    // Компоненты
     this._swipeManager = null;
     this._infoPanel = null;
+
+    // Состояние
     this._currentPhotoId = null;
-    this._preloadQueue = [];
-    this._preloadTimer = null;
     this._loadId = 0;
     this._settling = false;
+    this._trackStartPx = 0;
 
+    // Флаги фэйда
     this._fullReady = false;
     this._textReady = false;
 
+    // Очередь загрузки
+    this._preloadQueue = [];
+    this._preloadTimer = null;
+
+    // Сброс свайпа при возврате на вкладку
     this._handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') this.resetSwipe();
     };
     document.addEventListener('visibilitychange', this._handleVisibilityChange);
+
+    log('создан');
   }
 
   // ═══════════════════════════════════════
   // ПУБЛИЧНЫЙ API
   // ═══════════════════════════════════════
 
-render(direction) {
+  render(direction) {
     const photo = Store.getCurrentPhoto();
     if (!photo) return;
     if (!direction && this._currentPhotoId === photo.id) return;
@@ -128,16 +138,21 @@ render(direction) {
     const fullUrl = photo.imageUrl || previewUrl;
     const hasPreview = previewUrl !== fullUrl;
 
+    log(`#${photo.id} direction=${direction || 'open'} preview=${previewUrl?.substring(0, 50)}`);
+
     this._fullReady = false;
     this._textReady = false;
     this._centerImage.style.transition = 'none';
     this._centerImage.style.opacity = '1';
 
-    // Скрываем текст только при открытии из галереи, не при свайпе
+    // Текст
     if (!direction) {
       this._hideCenterText();
+    } else {
+      this._textReady = true;
     }
 
+    // Изображение
     if (hasPreview) {
       this._centerImage.src = previewUrl;
       this._centerFullImage.src = '';
@@ -149,29 +164,37 @@ render(direction) {
       this._centerWrapper.classList.remove(LOADING_CLASS);
     }
 
+    // Инфопанель
     if (!this._infoPanel) this._infoPanel = new InfoPanel();
     this._infoPanel.render(photo);
 
+    // Боковые слайды
     this._updateSideSlides();
     this._buildNeighborsQueue();
     this._processQueue();
 
     FeedbackPrompt.onPhotoOpened(photo.id);
 
+    // Счётчик
     const idx = Store.getCurrentIndex() + 1;
     const total = Store.getCount();
     this._counterEl.textContent = `${idx} из ${total}`;
 
+    // Хеш
     const newHash = `#${photo.id}`;
     if (window.location.hash !== newHash) history.replaceState(null, '', `/#${photo.id}`);
 
+    // SwipeManager
     if (!this._swipeManager) this._setupSwipeManager();
 
+    // Трек в центр
     this._resetTrackToCenter();
 
-    // Текст выезжает только при открытии из галереи
+    // Текст + фэйд
     if (!direction) {
       requestAnimationFrame(() => this._revealCenterText());
+    } else {
+      this._tryFade();
     }
   }
 
@@ -180,6 +203,7 @@ render(direction) {
     this._centerImage.style.transition = 'none';
     this._centerImage.style.opacity = '1';
     this._centerFullImage.src = '';
+    log('сброс состояния');
   }
 
   resetSwipe() {
@@ -218,8 +242,10 @@ render(direction) {
   // ═══════════════════════════════════════
 
   _loadFull(url) {
+    log(`загрузка full: ${url?.substring(0, 50)}`);
     const img = new Image();
     img.onload = () => {
+      log(`full загружен: ${url?.substring(0, 50)}`);
       if (!this._centerFullImage || !this._centerWrapper) return;
       this._centerFullImage.src = url;
       this._centerWrapper.classList.remove(LOADING_CLASS);
@@ -227,6 +253,7 @@ render(direction) {
       this._tryFade();
     };
     img.onerror = () => {
+      log(`ошибка загрузки full: ${url?.substring(0, 50)}`, 'error');
       if (this._centerWrapper) this._centerWrapper.classList.remove(LOADING_CLASS);
     };
     img.src = url;
@@ -235,6 +262,7 @@ render(direction) {
   _tryFade() {
     if (!this._fullReady || !this._textReady) return;
     if (!this._centerImage || !this._centerFullImage) return;
+    log('фэйд preview → full');
     this._centerImage.style.transition = `opacity ${FADE_DURATION}ms ease`;
     this._centerImage.style.opacity = '0';
   }
@@ -282,36 +310,18 @@ render(direction) {
   // ТРЕК
   // ═══════════════════════════════════════
 
-  /** Телепорт в центр */
   _resetTrackToCenter() {
     if (!this._track) return;
     this._track.style.transition = 'none';
     this._track.style.transform = `translateX(${TRACK_CENTER}vw)`;
   }
 
-  /**
-   * Получить РЕАЛЬНУЮ текущую позицию трека из computed styles (px).
-   */
-  _getTrackPosition() {
-    // Не используется для onMove, только для отладки
-    if (!this._track) return 0;
-    const style = getComputedStyle(this._track);
-    const matrix = new DOMMatrix(style.transform);
-    return matrix.m41;
-  }
-
-  /**
-   * Установить смещение трека относительно ЕГО ТЕКУЩЕЙ позиции.
-   * Вызывается при движении пальца.
-   */
   _setTrackOffset(px) {
     if (!this._track) return;
     this._track.style.transition = 'none';
     this._track.style.transform = `translateX(${this._trackStartPx + px}px)`;
   }
-  /**
-   * Анимировать трек к абсолютной позиции (vw).
-   */
+
   _animateTrackTo(targetVw, duration, callback) {
     if (!this._track) return;
     const targetPx = Math.round(targetVw * window.innerWidth / 100);
@@ -343,7 +353,6 @@ render(direction) {
       onMove: (offsetX, offsetY, direction) => {
         if (this._settling) return;
         if (direction === DIRECTION.LEFT || direction === DIRECTION.RIGHT) {
-          // Запоминаем позицию трека один раз в начале жеста
           if (!this._trackStartPx) {
             this._track.style.transition = 'none';
             const style = getComputedStyle(this._track);
@@ -357,6 +366,7 @@ render(direction) {
       onSwipeLeft: () => {
         if (this._settling) return;
         this._settling = true;
+        log('свайп влево');
         this._animateTrackTo(TRACK_LEFT, SWIPE_EXIT_DURATION, () => {
           Store.next();
           this.render('left');
@@ -367,6 +377,7 @@ render(direction) {
       onSwipeRight: () => {
         if (this._settling) return;
         this._settling = true;
+        log('свайп вправо');
         this._animateTrackTo(TRACK_RIGHT, SWIPE_EXIT_DURATION, () => {
           Store.prev();
           this.render('right');
@@ -376,7 +387,6 @@ render(direction) {
 
       onRelease: (direction) => {
         this._trackStartPx = 0;
-        this._trackLocked = false;
         if (!direction) {
           this._settling = true;
           this._animateTrackTo(TRACK_CENTER, SWIPE_RETURN_DURATION, () => {
@@ -385,10 +395,11 @@ render(direction) {
         }
       },
     });
+    log('SwipeManager настроен');
   }
 
   // ═══════════════════════════════════════
-  // ОЧЕРЕДЬ
+  // ОЧЕРЕДЬ ЗАГРУЗКИ
   // ═══════════════════════════════════════
 
   _buildNeighborsQueue() {

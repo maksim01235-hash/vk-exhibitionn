@@ -1,71 +1,102 @@
 /**
  * ImagePreloader — предзагрузчик изображений с кешированием.
- * Загружает не более MAX_CONCURRENT изображений одновременно.
+ * 
+ * НАЗНАЧЕНИЕ:
+ *   Загружает изображения в фоне с ограничением одновременных запросов.
+ *   Запоминает загруженные URL в памяти и localStorage.
+ * 
+ * КАК ЭТО РАБОТАЕТ:
+ *   - Не более MAX_CONCURRENT одновременных загрузок
+ *   - Очередь ожидающих загрузок
+ *   - Загруженные URL сохраняются в localStorage (последние 200)
+ *   - При повторном запросе — мгновенный резолв
+ *   - preloadWithPriority: срочные сразу, фоновые с задержкой
+ * 
+ * РАСШИРЕНИЕ:
+ *   — IndexedDB вместо localStorage для больших объёмов
+ *   — Прогресс загрузки (onProgress)
+ *   — Отмена pending-загрузок
  */
 
+import { createLogger } from '../utils/Logger.js';
+
+// ═══════════════════════════════════════
+// КОНСТАНТЫ
+// ═══════════════════════════════════════
+
+/** Включить логирование */
+const DEBUG = true;
+
+/** Ключ localStorage */
 const STORAGE_KEY = 'vk_exhibition_loaded_images';
+
+/** Максимум хранимых URL в localStorage */
 const MAX_STORED_URLS = 200;
-const MAX_CONCURRENT = 4; // Максимум одновременных загрузок
+
+/**
+ * Максимум одновременных загрузок.
+ * Увеличить — быстрее, но больше нагрузка на сеть.
+ * Уменьшить — экономнее, но медленнее.
+ */
+const MAX_CONCURRENT = 4;
+
+/** Задержка перед фоновыми загрузками (мс) */
 const BACKGROUND_DELAY = 500;
+
+// ═══════════════════════════════════════
+// ЛОГГЕР
+// ═══════════════════════════════════════
+
+const log = createLogger('Preloader', DEBUG);
 
 class ImagePreloader {
   constructor() {
-    /** @type {Map<string, Promise>} Активные загрузки (ключ — URL) */
     this._pending = new Map();
-
-    /** @type {Set<string>} Множество уже загруженных URL */
     this._loaded = new Set();
-    this._storageKey = STORAGE_KEY;
     this._activeCount = 0;
     this._queue = [];
+    this._totalLoaded = 0;
+    this._totalErrors = 0;
     this._loadFromStorage();
+    log(`создан, из кеша: ${this._loaded.size} URL`);
   }
 
-  _loadFromStorage() {
-    try {
-      const raw = localStorage.getItem(this._storageKey);
-      if (raw) {
-        const urls = JSON.parse(raw);
-        urls.forEach(url => this._loaded.add(url));
-      }
-    } catch (e) {}
-  }
+  // ═══════════════════════════════════════
+  // ПУБЛИЧНЫЙ API
+  // ═══════════════════════════════════════
 
-  _saveToStorage(url) {
-    try {
-      const urls = Array.from(this._loaded);
-      const trimmed = urls.slice(-MAX_STORED_URLS);
-      localStorage.setItem(this._storageKey, JSON.stringify(trimmed));
-    } catch (e) {}
-  }
-
-  /**
-   * Предзагрузить одно изображение.
-   * Если URL уже загружен или в процессе — возвращает существующий промис.
-   * 
-   * @param {string} url — URL изображения
-   * @returns {Promise<string|null>} url если загружено, null если ошибка
-   */
   preload(url) {
     if (!url) return Promise.resolve(null);
 
     // Уже загружено
-    if (this._loaded.has(url)) return Promise.resolve(url);
+    if (this._loaded.has(url)) {
+      return Promise.resolve(url);
+    }
 
-    // Уже в процессе загрузки — возвращаем существующий промис
-    if (this._pending.has(url)) return this._pending.get(url);
+    // Уже в процессе
+    if (this._pending.has(url)) {
+      return this._pending.get(url);
+    }
 
-    // Новая загрузка
+    const shortUrl = url.split('/').pop().substring(0, 40);
+
     const promise = new Promise((resolve) => {
       const load = () => {
         this._activeCount++;
+        log(`начало [${this._activeCount}/${MAX_CONCURRENT}] ${shortUrl}`);
         const img = new Image();
+        const startTime = Date.now();
         img.onload = img.onerror = () => {
+          const elapsed = Date.now() - startTime;
           if (img.naturalWidth > 0) {
             this._loaded.add(url);
+            this._totalLoaded++;
             this._saveToStorage(url);
+            log(`✓ ${shortUrl} (${elapsed}мс, всего: ${this._totalLoaded})`);
             resolve(url);
           } else {
+            this._totalErrors++;
+            log(`✗ ${shortUrl} — ошибка (${elapsed}мс)`, 'warn');
             resolve(null);
           }
           this._pending.delete(url);
@@ -78,6 +109,7 @@ class ImagePreloader {
       if (this._activeCount < MAX_CONCURRENT) {
         load();
       } else {
+        log(`в очереди: ${shortUrl} (очередь: ${this._queue.length + 1})`);
         this._queue.push(load);
       }
     });
@@ -86,42 +118,20 @@ class ImagePreloader {
     return promise;
   }
 
-  _processQueue() {
-    while (this._activeCount < MAX_CONCURRENT && this._queue.length > 0) {
-      const next = this._queue.shift();
-      next();
-    }
-  }
-
   preloadAll(urls) {
-    return Promise.all(
-      urls.filter(Boolean).map(url => this.preload(url))
-    );
+    log(`пачка из ${urls.length} URL`);
+    return Promise.all(urls.filter(Boolean).map(url => this.preload(url)));
   }
 
-  /**
-   * Предзагрузка с приоритетом.
-   * Срочные загружаются немедленно, фоновые — с задержкой.
-   * 
-   * @param {string[]} urgentUrls — срочные URL
-   * @param {string[]} [backgroundUrls=[]] — фоновые URL
-   * @returns {Promise} разрешается когда срочные загружены
-   */
   async preloadWithPriority(urgentUrls, backgroundUrls = []) {
+    log(`срочные: ${urgentUrls.length}, фоновые: ${backgroundUrls.length}`);
     const urgentPromise = this.preloadAll(urgentUrls);
-
     if (backgroundUrls.length > 0) {
       setTimeout(() => this.preloadAll(backgroundUrls), BACKGROUND_DELAY);
     }
-
     return urgentPromise;
   }
 
-  /**
-   * Проверить, загружен ли URL.
-   * @param {string} url
-   * @returns {boolean}
-   */
   isLoaded(url) {
     return this._loaded.has(url);
   }
@@ -134,13 +144,53 @@ class ImagePreloader {
     return this._pending.size;
   }
 
+  getStats() {
+    return {
+      loaded: this._totalLoaded,
+      errors: this._totalErrors,
+      pending: this._pending.size,
+      cached: this._loaded.size,
+      active: this._activeCount,
+      queued: this._queue.length,
+    };
+  }
+
   clearCache() {
     this._loaded.clear();
     this._pending.clear();
     this._queue = [];
     this._activeCount = 0;
+    this._totalLoaded = 0;
+    this._totalErrors = 0;
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    log('кеш очищен');
+  }
+
+  // ═══════════════════════════════════════
+  // ХРАНИЛИЩЕ
+  // ═══════════════════════════════════════
+
+  _processQueue() {
+    while (this._activeCount < MAX_CONCURRENT && this._queue.length > 0) {
+      this._queue.shift()();
+    }
+  }
+
+  _loadFromStorage() {
     try {
-      localStorage.removeItem(this._storageKey);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const urls = JSON.parse(raw);
+        urls.forEach(url => this._loaded.add(url));
+      }
+    } catch (e) {}
+  }
+
+  _saveToStorage(url) {
+    try {
+      const urls = Array.from(this._loaded);
+      const trimmed = urls.slice(-MAX_STORED_URLS);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
     } catch (e) {}
   }
 }

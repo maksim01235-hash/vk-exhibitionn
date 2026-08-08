@@ -1,25 +1,30 @@
 /**
  * DataLayer — загрузка и парсинг данных из Google Таблицы.
  * 
- * Источник данных — опубликованная Google Sheet (CSV).
- * При ошибке сети используется резервная копия из localStorage.
+ * НАЗНАЧЕНИЕ:
+ *   Загружает CSV из опубликованной Google Sheet, парсит в массив объектов,
+ *   передаёт в Store. При ошибке сети восстанавливает из localStorage.
  * 
- * При расширении можно добавить:
- *   - DataLayer для анонсов (отдельная таблица)
- *   - DataLayer для достижений (Firebase/свой API)
- *   - Кеширование изображений в IndexedDB
+ * ПРИ РАСШИРЕНИИ ДОБАВИТЬ:
+ *   — DataLayer для анонсов (отдельная таблица)
+ *   — DataLayer для достижений (Firebase/свой API)
+ *   — Кеширование изображений в IndexedDB
  */
 
 import CONFIG from '../config.js';
 import Store from '../core/Store.js';
+import { createLogger } from '../utils/Logger.js';
 
 // ═══════════════════════════════════════
 // КОНСТАНТЫ
 // ═══════════════════════════════════════
 
+/** Включить логирование */
+const DEBUG = true;
+
 /**
  * Поля, которые НЕ попадают в блок «Технические параметры».
- * Всё, что не в этом списке, автоматически отображается в техпараметрах.
+ * Всё, что не в этом списке — автоматически отображается в техпараметрах.
  * 
  * Чтобы добавить новый техпараметр (например, «вспышка»):
  *   — Добавьте столбец «flash» в Google Таблицу
@@ -31,42 +36,48 @@ import Store from '../core/Store.js';
  *   — Отобразите в InfoPanel.render()
  */
 const BASE_FIELDS = [
-  'id',              // Уникальный ID фотографии (для QR-кодов: /#id)
-  'order',           // Порядок сортировки в галерее (число)
-  'title',           // Название работы (поддерживает Markdown)
-  'photographer',    // Автор (поддерживает Markdown)
-  'description',     // Описание (поддерживает Markdown, абзацы, списки)
+  'id',              // Уникальный ID фото (для QR-кодов: /#id)
+  'order',           // Порядок сортировки в галерее
+  'title',           // Название (Markdown)
+  'photographer',    // Автор (Markdown)
+  'description',     // Описание (Markdown, многострочный)
   'funFact',         // Интересный факт (Markdown)
-  'imageUrl',        // Прямая ссылка на полноразмерное изображение (JPEG/PNG)
-  'imagePreviewUrl', // Прямая ссылка на превью (~400px ширина, ~200 КБ)
-  'originalUrl',     // Ссылка на оригинал (внешний ресурс, например astrobin)
-  'category',        // Категория (для будущей группировки в галерее)
+  'imageUrl',        // Прямая ссылка на полноразмерное изображение
+  'imagePreviewUrl', // Прямая ссылка на превью (~400px, ~200 КБ)
+  'originalUrl',     // Ссылка на внешний ресурс
+  'category',        // Категория (для будущей группировки)
 ];
 
-/** Ключ для резервной копии данных в localStorage */
+/** Ключ для резервной копии в localStorage */
 const BACKUP_KEY = 'vk_exhibition_data_backup';
+
+// ═══════════════════════════════════════
+// ЛОГГЕР
+// ═══════════════════════════════════════
+
+const log = createLogger('DataLayer', DEBUG);
 
 class DataLayer {
   // ═══════════════════════════════════════
   // ПУБЛИЧНЫЙ API
   // ═══════════════════════════════════════
 
-  /**
-   * Загрузить данные и передать в Store.
-   * При ошибке сети — восстановить из резервной копии.
-   */
   async load() {
+    log('начало загрузки...');
     try {
       const photos = await this._fetchFromSheet();
       Store.setPhotos(photos);
       this._saveBackup(photos);
+      log(`загружено ${photos.length} фото, резервная копия сохранена`);
     } catch (error) {
-      console.warn('DataLayer: ошибка загрузки, пробуем кеш:', error.message);
+      log(`ошибка загрузки: ${error.message}, пробую кеш`, 'warn');
       const backup = this._getBackup();
       if (backup) {
         Store.setPhotos(backup);
+        log(`восстановлено ${backup.length} фото из кеша`);
       } else {
         Store.setError('Нет подключения к интернету');
+        log('кеш пуст — показываю ошибку', 'error');
       }
     }
   }
@@ -75,57 +86,52 @@ class DataLayer {
   // ЗАГРУЗКА CSV
   // ═══════════════════════════════════════
 
-  /**
-   * Загрузить CSV из Google Sheets.
-   * @returns {Promise<Object[]>}
-   */
   async _fetchFromSheet() {
-    const response = await fetch(CONFIG.EXHIBITION.SHEET_URL);
+    const url = CONFIG.EXHIBITION.SHEET_URL;
+    log(`запрос к Google Sheets: ${url.substring(0, 60)}...`);
+
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
 
     const csvText = await response.text();
-    console.log('CSV: первые 500 символов:', csvText.substring(0, 500));
+    log(`получено ${csvText.length} байт CSV`);
 
     const photos = this._parseCSV(csvText);
-    console.log(`DataLayer: загружено ${photos.length} фото`);
-    photos.forEach(p => console.log(`  #${p.id}: ${p.title?.substring(0, 40)}`));
+    log(`распаршено ${photos.length} фото`);
+
+    if (DEBUG) {
+      photos.forEach(p => log(`  #${p.id}: ${p.title?.substring(0, 50)}`));
+    }
 
     return photos;
   }
 
-  /**
-   * Разобрать CSV-текст в массив объектов фотографий.
-   * 
-   * Каждая фотография получает все поля из заголовков таблицы.
-   * Поля, не входящие в BASE_FIELDS, попадают в объект techInfo.
-   * 
-   * @param {string} csvText
-   * @returns {Object[]} Массив фото с полями:
-   *   { id, order, title, photographer, description, funFact,
-   *     imageUrl, imagePreviewUrl, originalUrl, category,
-   *     techInfo: { camera, lens, iso, aperture, ... } }
-   */
   _parseCSV(csvText) {
     const lines = this._splitCSVLines(csvText);
-    if (lines.length < 2) return [];
+    if (lines.length < 2) {
+      log('CSV пуст или содержит только заголовки', 'warn');
+      return [];
+    }
 
     const headers = this._parseCSVRow(lines[0]).map(h => h.trim());
+    log(`заголовки (${headers.length}): ${headers.join(', ')}`);
+
     const photos = [];
+    let skipped = 0;
 
     for (let i = 1; i < lines.length; i++) {
       const row = this._parseCSVRow(lines[i]);
-      if (row.length === 0) continue;
+      if (row.length === 0) { skipped++; continue; }
 
       const photo = {};
 
-      // Заполняем поля из строки CSV
       headers.forEach((header, index) => {
         photo[header] = index < row.length ? row[index].trim() : '';
       });
 
-      // Автосбор техпараметров: всё, что не в BASE_FIELDS
+      // Автосбор техпараметров
       photo.techInfo = {};
       headers.forEach(header => {
         if (!BASE_FIELDS.includes(header) && photo[header]) {
@@ -133,13 +139,16 @@ class DataLayer {
         }
       });
 
-      // Пропускаем пустые строки (нет id и нет контента)
       if (photo.id && (photo.title || photo.imageUrl)) {
         photos.push(photo);
+      } else {
+        skipped++;
       }
     }
 
-    // Сортировка: сначала по order (если есть), затем по id
+    if (skipped > 0) log(`пропущено ${skipped} пустых строк`);
+
+    // Сортировка: order → id
     photos.sort((a, b) => {
       if (a.order && b.order) return Number(a.order) - Number(b.order);
       return Number(a.id) - Number(b.id);
@@ -152,13 +161,6 @@ class DataLayer {
   // CSV-ПАРСЕР
   // ═══════════════════════════════════════
 
-  /**
-   * Разбить CSV-текст на строки с учётом кавычек.
-   * Многострочные ячейки (с переносами) остаются целыми.
-   * 
-   * @param {string} text
-   * @returns {string[]}
-   */
   _splitCSVLines(text) {
     const lines = [];
     let current = '';
@@ -183,13 +185,6 @@ class DataLayer {
     return lines;
   }
 
-  /**
-   * Разобрать одну строку CSV на массив значений.
-   * Поддерживает экранированные кавычки "".
-   * 
-   * @param {string} line
-   * @returns {string[]}
-   */
   _parseCSVRow(line) {
     const result = [];
     let current = '';
@@ -221,27 +216,27 @@ class DataLayer {
   // РЕЗЕРВНОЕ КОПИРОВАНИЕ
   // ═══════════════════════════════════════
 
-  /**
-   * Сохранить данные в localStorage.
-   * @param {Object[]} photos
-   */
   _saveBackup(photos) {
     try {
       localStorage.setItem(BACKUP_KEY, JSON.stringify(photos));
+      log(`резервная копия сохранена (${photos.length} фото)`);
     } catch (e) {
-      console.warn('DataLayer: не удалось сохранить резервную копию');
+      log('не удалось сохранить резервную копию', 'warn');
     }
   }
 
-  /**
-   * Восстановить данные из localStorage.
-   * @returns {Object[]|null}
-   */
   _getBackup() {
     try {
       const raw = localStorage.getItem(BACKUP_KEY);
-      return raw ? JSON.parse(raw) : null;
+      if (raw) {
+        const data = JSON.parse(raw);
+        log(`резервная копия найдена (${data.length} фото)`);
+        return data;
+      }
+      log('резервная копия отсутствует');
+      return null;
     } catch (e) {
+      log('ошибка чтения резервной копии', 'error');
       return null;
     }
   }

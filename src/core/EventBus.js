@@ -1,38 +1,59 @@
 /**
  * EventBus — центральная шина событий (паттерн Observer).
  * 
- * Основа модульной архитектуры. Все компоненты общаются через события,
- * не связываясь напрямую. Это позволяет легко добавлять новые модули
- * (анонсы, достижения, уведомления) без переписывания существующих.
+ * НАЗНАЧЕНИЕ:
+ *   Основа модульной архитектуры. Все компоненты общаются через события,
+ *   не связываясь напрямую. Позволяет добавлять новые модули (анонсы,
+ *   достижения, уведомления) без переписывания существующих.
  * 
- * Используется как синглтон: import EventBus from './EventBus.js'
+ * ИСПОЛЬЗОВАНИЕ:
+ *   import EventBus from './EventBus.js'
+ *   EventBus.on('event', data => { ... });
+ *   EventBus.emit('event', payload);
  * 
- * Стандартные события приложения:
- *   photos:loaded     — данные загружены
- *   photos:error      — ошибка загрузки данных
- *   photo:changed     — переключение фото в Store
+ * СТАНДАРТНЫЕ СОБЫТИЯ:
+ *   photos:loaded      — данные загружены (data: массив фото)
+ *   photos:error       — ошибка загрузки данных (data: сообщение)
+ *   photo:changed      — переключение фото в Store (data: объект фото)
  *   router:openGallery — переход на галерею
  *   router:openPhoto   — переход на фото (data: id)
  *   router:openQR      — открыть сканер QR
  */
 
+import { createLogger } from '../utils/Logger.js';
+
+// ═══════════════════════════════════════
+// КОНСТАНТЫ
+// ═══════════════════════════════════════
+
+/** Включить логирование событий */
+const DEBUG = true;
+
+// ═══════════════════════════════════════
+// ЛОГГЕР
+// ═══════════════════════════════════════
+
+const log = createLogger('EventBus', DEBUG);
+
 class EventBus {
   constructor() {
-    /** @type {Object<string, Function[]>} */
+    /** @type {Object<string, Function[]>} Слушатели по событиям */
     this._listeners = {};
+    log('синглтон создан');
   }
 
   /**
    * Подписаться на событие.
-   * @param {string} event - Имя события
-   * @param {Function} callback - Обработчик
-   * @returns {Function} Функция отписки
+   * @param {string} event — имя события
+   * @param {Function} callback — обработчик
+   * @returns {Function} функция отписки
    */
   on(event, callback) {
     if (!this._listeners[event]) {
       this._listeners[event] = [];
     }
     this._listeners[event].push(callback);
+    log(`подписка на "${event}", всего слушателей: ${this._listeners[event].length}`);
     return () => this.off(event, callback);
   }
 
@@ -44,6 +65,7 @@ class EventBus {
   off(event, callback) {
     if (!this._listeners[event]) return;
     this._listeners[event] = this._listeners[event].filter(cb => cb !== callback);
+    log(`отписка от "${event}", осталось: ${this._listeners[event].length}`);
   }
 
   /**
@@ -53,12 +75,16 @@ class EventBus {
    * @param {*} [data]
    */
   emit(event, data) {
-    if (!this._listeners[event]) return;
+    if (!this._listeners[event]) {
+      log(`"${event}" — нет слушателей, пропущено`, 'warn');
+      return;
+    }
+    log(`"${event}" → ${this._listeners[event].length} слушателей`);
     this._listeners[event].forEach(cb => {
       try {
         cb(data);
       } catch (e) {
-        console.error(`EventBus: ошибка в "${event}":`, e);
+        log(`ошибка в обработчике "${event}": ${e.message}`, 'error');
       }
     });
   }
@@ -79,8 +105,10 @@ class EventBus {
   clear(event) {
     if (event) {
       delete this._listeners[event];
+      log(`событие "${event}" очищено`);
     } else {
       this._listeners = {};
+      log('все события очищены');
     }
   }
 }

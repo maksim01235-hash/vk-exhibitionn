@@ -1,64 +1,60 @@
 /**
  * Service Worker — офлайн-кеширование приложения «Выставка».
  * 
- * Стратегии:
- *   - Статические файлы: кешируются при установке
- *   - Google Sheets / EmailJS: сеть → кеш (при ошибке — кеш)
- *   - Изображения: кеш → сеть (мгновенная отдача из кеша, фоновое обновление)
- *   - Всё остальное: кеш → сеть → фоновое обновление кеша
+ * СТРАТЕГИИ КЕШИРОВАНИЯ:
+ *   - Статические файлы: кешируются при установке (install)
+ *   - Google Sheets / EmailJS: сеть → кеш, при ошибке — кеш
+ *   - Изображения: кеш → сеть (мгновенная отдача, фоновое обновление)
+ *   - Всё остальное: кеш → сеть → фоновое обновление
  * 
- * Чтобы сбросить кеш при обновлении — увеличьте CACHE_VERSION.
+ * ОБНОВЛЕНИЕ КЕША:
+ *   Увеличьте CACHE_NAME (v7 → v8) при изменении статических файлов.
+ *   Старый кеш удалится автоматически при активации.
+ * 
+ * ОТЛАДКА:
+ *   DEBUG = true — подробные логи в консоли SW (Application → Service Workers → inspect)
+ *   DEBUG = false — только критические ошибки
  */
 
 // ═══════════════════════════════════════
 // НАСТРОЙКИ
 // ═══════════════════════════════════════
 
+/** Включить подробное логирование */
+const DEBUG = true;
+
 /** Версия кеша — менять при обновлении статики */
-// Версия кеша импортируется из config (нельзя, SW отдельный)
-const CACHE_NAME = 'vk-exhibition-v7';
+const CACHE_NAME = 'vk-exhibition-v9';
 
 /** Максимальный размер кешируемого изображения (10 MB) */
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
-/** Статические файлы для предкеширования */
+/**
+ * Статические файлы для предкеширования при установке.
+ * При добавлении новых файлов в проект — добавьте их сюда.
+ * Локальные файлы начинаются с './', CDN — полные URL.
+ */
 const STATIC_ASSETS = [
-  // HTML
   './',
   './index.html',
-
-  // CSS
   './styles/main.css',
-
-  // JS — ядро
   './src/app.js',
   './src/config.js',
-
-  // JS — core
   './src/core/EventBus.js',
   './src/core/Store.js',
   './src/core/Router.js',
-
-  // JS — data
   './src/data/DataLayer.js',
-
-  // JS — ui
   './src/ui/UIManager.js',
   './src/ui/GalleryView.js',
   './src/ui/PhotoView.js',
   './src/ui/InfoPanel.js',
   './src/ui/SwipeManager.js',
   './src/ui/QRScanner.js',
-
-  // JS — utils
+  './src/utils/Logger.js',
   './src/utils/markdown.js',
   './src/utils/ImagePreloader.js',
   './src/utils/FeedbackPrompt.js',
-
-  // Статика
   './assets/placeholder.jpg',
-
-  // CDN-зависимости
   'https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js',
   'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
@@ -70,6 +66,9 @@ const STATIC_ASSETS = [
 // УТИЛИТЫ
 // ═══════════════════════════════════════
 
+function log(...args) { if (DEBUG) console.log('[SW]', ...args); }
+function warn(...args) { if (DEBUG) console.warn('[SW]', ...args); }
+
 function isCacheable(response) {
   return response && response.ok && response.status === 200;
 }
@@ -79,12 +78,20 @@ function isCacheable(response) {
 // ═══════════════════════════════════════
 
 self.addEventListener('install', (event) => {
-  console.log('SW: установка...');
+  log('установка, кеширую статику...');
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('SW: кеширую статику...');
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('SW: не все ассеты закешированы:', err.message);
+      return cache.addAll(STATIC_ASSETS).then(() => {
+        log('статика закеширована успешно');
+      }).catch((err) => {
+        warn('не все ассеты закешированы:', err.message);
+        if (DEBUG) {
+          STATIC_ASSETS.forEach(url => {
+            fetch(url).then(r => {
+              if (!r.ok) warn(`404 — ${url}`);
+            }).catch(() => warn(`ошибка сети — ${url}`));
+          });
+        }
       });
     })
   );
@@ -95,16 +102,14 @@ self.addEventListener('install', (event) => {
 // ═══════════════════════════════════════
 
 self.addEventListener('activate', (event) => {
-  console.log('SW: активация...');
+  log('активация, чищу старые кеши...');
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => {
-            console.log('SW: удаляю старый кеш:', key);
-            return caches.delete(key);
-          })
+        keys.filter((key) => key !== CACHE_NAME).map((key) => {
+          log('удаляю старый кеш:', key);
+          return caches.delete(key);
+        })
       );
     })
   );
@@ -116,9 +121,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  const dest = event.request.destination;
 
   // ── Google Sheets / EmailJS: сеть → кеш ──
   if (url.hostname === 'docs.google.com' || url.hostname === 'api.emailjs.com') {
+    log(`${url.hostname} — сеть → кеш`);
     event.respondWith(
       fetch(event.request)
         .then((response) => {
@@ -128,69 +135,94 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(event.request)) // Офлайн — отдаём кеш
+        .catch((err) => {
+          warn(`${url.hostname} — ошибка сети, пробую кеш:`, err.message);
+          return caches.match(event.request);
+        })
     );
     return;
   }
 
   // ── Изображения: кеш → сеть (фон) ──
-  if (event.request.destination === 'image') {
+  if (dest === 'image') {
+    log(`image — ${url.hostname}${url.pathname.substring(0, 40)}`);
     event.respondWith(
       caches.match(event.request).then((cached) => {
         if (cached) {
-          // Отдаём из кеша мгновенно, в фоне обновляем
+          log('image — найдено в кеше, отдаю + фоновое обновление');
           fetch(event.request)
             .then((response) => {
               if (isCacheable(response)) {
                 const contentLength = response.headers.get('content-length');
+                const size = contentLength ? parseInt(contentLength) : 'неизвестно';
                 if (!contentLength || parseInt(contentLength) <= MAX_IMAGE_SIZE) {
                   caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
+                  log(`image — обновлено (${size} байт)`);
+                } else {
+                  log(`image — слишком большое (${size} байт), не кеширую`);
                 }
               }
             })
-            .catch(() => {});
+            .catch((err) => warn('image — ошибка фонового обновления:', err.message));
           return cached;
         }
 
-        // В кеше нет — грузим из сети и кешируем
+        log('image — нет в кеше, гружу из сети');
         return fetch(event.request)
           .then((response) => {
             if (isCacheable(response)) {
               const contentLength = response.headers.get('content-length');
+              const size = contentLength ? parseInt(contentLength) : 'неизвестно';
               if (!contentLength || parseInt(contentLength) <= MAX_IMAGE_SIZE) {
                 const cloned = response.clone();
                 caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+                log(`image — закешировано (${size} байт)`);
+              } else {
+                log(`image — слишком большое (${size} байт)`);
               }
+            } else {
+              log('image — статус ' + (response ? response.status : 'нет ответа'));
             }
             return response;
           })
-          .catch(() => caches.match('/assets/placeholder.jpg'));
+          .catch((err) => {
+            warn('image — ошибка сети:', err.message);
+            return caches.match('./assets/placeholder.jpg');
+          });
       })
     );
     return;
   }
 
   // ── Всё остальное: кеш → сеть → фон ──
+  log(`static — ${url.pathname}`);
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Отдаём из кеша, а в фоне обновляем
+        log('static — найдено в кеше, отдаю + фоновое обновление');
         fetch(event.request)
           .then((response) => {
             if (isCacheable(response)) {
               caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
             }
           })
-          .catch(() => {}); // Сеть недоступна — ничего не делаем
+          .catch(() => {});
         return cachedResponse;
       }
 
+      log('static — нет в кеше, гружу из сети');
       return fetch(event.request).then((response) => {
         if (isCacheable(response)) {
           const cloned = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
         }
         return response;
+      }).catch((err) => {
+        warn('static — ошибка сети:', err.message);
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+        throw err;
       });
     })
   );

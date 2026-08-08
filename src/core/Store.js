@@ -1,19 +1,31 @@
 /**
  * Store — центральное хранилище состояния приложения.
  * 
- * Содержит:
- *   - Список всех фотографий
- *   - Индекс текущей открытой фотографии
- *   - Состояние загрузки
+ * НАЗНАЧЕНИЕ:
+ *   Хранит массив фотографий, индекс текущей, состояние загрузки.
+ *   При изменениях оповещает подписчиков через EventBus.
  * 
- * При изменении данных оповещает подписчиков через EventBus.
- * При расширении можно добавить хранилища для:
- *   - достижений пользователя
- *   - анонсов выставок
- *   - статуса уведомлений
+ * ПРИ РАСШИРЕНИИ ДОБАВИТЬ:
+ *   — Хранилище достижений пользователя
+ *   — Хранилище анонсов выставок
+ *   — Статус уведомлений
  */
 
 import EventBus from './EventBus.js';
+import { createLogger } from '../utils/Logger.js';
+
+// ═══════════════════════════════════════
+// КОНСТАНТЫ
+// ═══════════════════════════════════════
+
+/** Включить логирование */
+const DEBUG = true;
+
+// ═══════════════════════════════════════
+// ЛОГГЕР
+// ═══════════════════════════════════════
+
+const log = createLogger('Store', DEBUG);
 
 class Store {
   constructor() {
@@ -28,6 +40,8 @@ class Store {
 
     /** @type {string|null} Сообщение об ошибке */
     this._error = null;
+
+    log('синглтон создан');
   }
 
   // ═══════════════════════════════════════
@@ -42,6 +56,7 @@ class Store {
     this._photos = photos || [];
     this._isLoading = false;
     this._error = null;
+    log(`загружено ${this._photos.length} фото`);
     EventBus.emit('photos:loaded', this._photos);
   }
 
@@ -52,6 +67,7 @@ class Store {
   setError(error) {
     this._isLoading = false;
     this._error = error;
+    log(`ошибка загрузки: ${error}`, 'error');
     EventBus.emit('photos:error', error);
   }
 
@@ -77,9 +93,13 @@ class Store {
    */
   navigateToId(id) {
     const index = this._photos.findIndex(p => String(p.id) === String(id));
-    if (index === -1) return false;
+    if (index === -1) {
+      log(`фото #${id} не найдено`, 'warn');
+      return false;
+    }
 
     this._currentIndex = index;
+    log(`переход к фото #${id} (индекс ${index})`);
     EventBus.emit('photo:changed', this.getCurrentPhoto());
     return true;
   }
@@ -92,6 +112,7 @@ class Store {
     if (this._photos.length === 0) return null;
     this._currentIndex = (this._currentIndex + 1) % this._photos.length;
     const photo = this.getCurrentPhoto();
+    log(`следующее фото #${photo?.id} (индекс ${this._currentIndex})`);
     EventBus.emit('photo:changed', photo);
     return photo;
   }
@@ -104,6 +125,7 @@ class Store {
     if (this._photos.length === 0) return null;
     this._currentIndex = (this._currentIndex - 1 + this._photos.length) % this._photos.length;
     const photo = this.getCurrentPhoto();
+    log(`предыдущее фото #${photo?.id} (индекс ${this._currentIndex})`);
     EventBus.emit('photo:changed', photo);
     return photo;
   }
