@@ -1,18 +1,5 @@
 /**
  * QRScanner — сканер QR-кодов через камеру.
- * 
- * Использует библиотеку Html5Qrcode.
- * При успешном сканировании извлекает ID фотографии и переходит к ней.
- * Если ID не найден — возвращает в галерею.
- * 
- * Поддерживаемые форматы QR:
- *   - https://vk.com/app54708970/#1
- *   - 1 (просто число)
- * 
- * При расширении можно добавить:
- *   - Выбор из галереи (загрузка изображения с QR)
- *   - Звуковой сигнал при успешном сканировании
- *   - Визуальная рамка с анимацией
  */
 
 import EventBus from '../core/EventBus.js';
@@ -22,136 +9,151 @@ import Router from '../core/Router.js';
 // КОНСТАНТЫ
 // ═══════════════════════════════════════
 
-/** Настройки камеры: задняя (environment) или передняя (user) */
 const CAMERA_FACING = 'environment';
-
-/** Частота сканирования (кадров в секунду) */
 const SCAN_FPS = 10;
-
-/** Размер области сканирования (px) */
 const QRBOX_SIZE = { width: 250, height: 250 };
-
-/** CSS-селектор контейнера для сканера */
 const READER_ID = 'qr-reader';
 
-/** Сообщения */
 const MSG_LIB_NOT_LOADED = '<p class="qr-error">Библиотека сканера не загружена</p>';
 const MSG_CAMERA_ERROR = `
   <p class="qr-error">Не удалось запустить камеру</p>
   <p class="qr-error-hint">Проверьте разрешение на использование камеры или используйте мобильное устройство</p>
 `;
 
+// ═══════════════════════════════════════
+// ЛОГИРОВАНИЕ
+// ═══════════════════════════════════════
+
+/** @type {string[]} Логи работы с камерой */
+const cameraLogs = [];
+
+function cameraLog(message, data) {
+  const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+  const entry = `[${timestamp}] ${message}` + (data !== undefined ? ` ${JSON.stringify(data)}` : '');
+  console.log('QRScanner:', entry);
+  cameraLogs.push(entry);
+  // Храним последние 100 записей
+  if (cameraLogs.length > 100) cameraLogs.shift();
+}
+
+/** Получить все логи камеры */
+export function getCameraLogs() {
+  return cameraLogs.join('\n');
+}
+
 class QRScanner {
   constructor() {
-    /** @type {Html5Qrcode|null} Экземпляр сканера */
     this._reader = null;
-
-    /** @type {HTMLElement} Контейнер для вставки видео */
     this._readerContainer = document.getElementById(READER_ID);
-
-    /** @type {boolean} Запущен ли сканер */
     this._isRunning = false;
   }
 
-  // ═══════════════════════════════════════
-  // ПУБЛИЧНЫЙ API
-  // ═══════════════════════════════════════
-
-  /**
-   * Запустить сканер. Если уже запущен — выходит.
-   * При ошибке камеры показывает сообщение пользователю.
-   */
   async start() {
-    if (this._isRunning) return;
+    if (this._isRunning) {
+      cameraLog('start: уже запущен, выход');
+      return;
+    }
+
+    cameraLog('start: начало инициализации');
+    cameraLog('start: userAgent', navigator.userAgent);
+    cameraLog('start: platform', navigator.platform);
+    cameraLog('start: vendor', navigator.vendor);
 
     this._readerContainer.innerHTML = '';
 
     if (typeof Html5Qrcode === 'undefined') {
+      cameraLog('start: ОШИБКА — Html5Qrcode не загружен');
       this._readerContainer.innerHTML = MSG_LIB_NOT_LOADED;
       return;
     }
 
+    cameraLog('start: Html5Qrcode доступен, версия', Html5Qrcode.version);
+
+    // Проверяем доступные камеры
     try {
-      this._reader = new Html5Qrcode(READER_ID);
-      this._isRunning = true;
+      const devices = await Html5Qrcode.getCameras();
+      cameraLog('start: найдено камер', devices.length);
+      devices.forEach((d, i) => cameraLog(`start: камера ${i}`, { id: d.id, label: d.label }));
+    } catch (e) {
+      cameraLog('start: не удалось получить список камер', e.message);
+    }
 
-      // Пробуем разные конфигурации камеры
-      const cameraConfigs = [
-        { facingMode: 'environment' },
-        { facingMode: { exact: 'environment' } },
-        {}, // без указания — что даст браузер
-      ];
+    // Пробуем разные конфигурации
+    const cameraConfigs = [
+      { name: 'environment (мягкий)', config: { facingMode: 'environment' } },
+      { name: 'environment (строгий)', config: { facingMode: { exact: 'environment' } } },
+      { name: 'без указания', config: {} },
+    ];
 
-      let started = false;
+    let started = false;
 
-      for (const config of cameraConfigs) {
-        try {
-          await this._reader.start(
-            config,
-            {
-              fps: SCAN_FPS,
-              qrbox: QRBOX_SIZE,
-              aspectRatio: 1.0,
-            },
-            (decodedText) => this._onScanSuccess(decodedText),
-            () => {}
-          );
-          started = true;
-          break;
-        } catch (err) {
-          console.log('QRScanner: не удалось с конфигом', config, err.message);
-          // Пробуем следующий
-        }
+    for (const { name, config } of cameraConfigs) {
+      if (started) break;
+
+      cameraLog(`start: пробую конфиг "${name}"`, config);
+
+      try {
+        this._reader = new Html5Qrcode(READER_ID);
+        this._isRunning = true;
+
+        await this._reader.start(
+          config,
+          {
+            fps: SCAN_FPS,
+            qrbox: QRBOX_SIZE,
+            aspectRatio: 1.0,
+          },
+          (decodedText) => {
+            cameraLog('scan: успешно считан QR', decodedText.substring(0, 50));
+            this._onScanSuccess(decodedText);
+          },
+          (errorMessage) => {
+            // Ошибки сканирования в процессе — не логируем чтобы не засорять
+          }
+        );
+
+        cameraLog(`start: УСПЕХ с конфигом "${name}"`);
+        started = true;
+      } catch (err) {
+        cameraLog(`start: ОШИБКА с конфигом "${name}"`, {
+          message: err.message,
+          name: err.name,
+        });
+        this._isRunning = false;
       }
+    }
 
-      if (!started) {
-        throw new Error('Ни одна конфигурация камеры не подошла');
-      }
-
-    } catch (err) {
-      console.log('QRScanner: камера недоступна:', err.message);
+    if (!started) {
+      cameraLog('start: ВСЕ КОНФИГИ ПРОВАЛИЛИСЬ');
       this._isRunning = false;
       this._readerContainer.innerHTML = MSG_CAMERA_ERROR;
     }
   }
 
-  /**
-   * Остановить сканер.
-   * Безопасно — можно вызывать даже если сканер не запущен.
-   */
-  stop() {
-    if (!this._reader || !this._isRunning) return;
-
-    try {
-      this._reader.stop().catch(() => {});
-    } catch (e) {
-      // Игнорируем ошибки остановки
-    }
-    this._isRunning = false;
-  }
-
-  // ═══════════════════════════════════════
-  // ОБРАБОТКА РЕЗУЛЬТАТА
-  // ═══════════════════════════════════════
-
-  /**
-   * Обработка успешного сканирования.
-   * Извлекает ID фото из распознанного текста.
-   * 
-   * @param {string} decodedText — содержимое QR-кода
-   */
   _onScanSuccess(decodedText) {
+    cameraLog('onScanSuccess: распознано', decodedText);
     this.stop();
 
-    // Извлекаем ID фото (делегируем Router)
     const id = Router._extractPhotoId(decodedText);
-    console.log('QRScanner: ID =', id);
+    cameraLog('onScanSuccess: извлечён ID', id);
 
     if (id) {
       EventBus.emit('router:openPhoto', id);
     } else {
       alert(`QR-код считан, но ID фотографии не найден.\nСодержимое: ${decodedText}`);
       EventBus.emit('router:openGallery');
+    }
+  }
+
+  stop() {
+    cameraLog('stop: остановка сканера');
+    if (this._reader && this._isRunning) {
+      try {
+        this._reader.stop().catch(() => {});
+      } catch (e) {
+        cameraLog('stop: ошибка остановки', e.message);
+      }
+      this._isRunning = false;
     }
   }
 }

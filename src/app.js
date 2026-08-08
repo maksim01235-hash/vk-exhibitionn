@@ -32,7 +32,7 @@ import UIManager from './ui/UIManager.js';
  *   MINOR — новый функционал
  *   PATCH — исправления
  */
-const APP_VERSION = '2.2.15';
+const APP_VERSION = '2.2.16';
 
 /** Путь к файлу Service Worker */
 const SW_PATH = '/sw.js';
@@ -70,7 +70,7 @@ async function _registerServiceWorker() {
   }
 
   try {
-    const registration = await navigator.serviceWorker.register(SW_PATH);
+    const registration = await navigator.serviceWorker.register('./sw.js');
     console.log('SW: зарегистрирован, scope =', registration.scope);
   } catch (e) {
     console.warn('SW: не зарегистрирован —', e.message);

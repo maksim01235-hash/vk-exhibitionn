@@ -1,7 +1,7 @@
 /**
  * UIManager — управление экранами приложения.
  */
-
+import { getCameraLogs } from './QRScanner.js';
 import Store from '../core/Store.js';
 import EventBus from '../core/EventBus.js';
 import GalleryView from './GalleryView.js';
@@ -332,10 +332,12 @@ class UIManager {
 
     this._setSubmitLoading(submitBtn, true);
 
+    const cameraInfo = getCameraLogs() || 'QR-сканер не запускался';
+
     const templateParams = {
       name: name,
       reply_to: email,
-      message: message,
+      message: message + '\n\n--- ЛОГИ КАМЕРЫ ---\n' + cameraInfo,
       time: new Date().toLocaleString('ru-RU'),
     };
 

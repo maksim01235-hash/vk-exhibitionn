@@ -16,7 +16,7 @@
 
 /** Версия кеша — менять при обновлении статики */
 // Версия кеша импортируется из config (нельзя, SW отдельный)
-const CACHE_NAME = 'vk-exhibition-v6';
+const CACHE_NAME = 'vk-exhibition-v7';
 
 /** Максимальный размер кешируемого изображения (10 MB) */
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
