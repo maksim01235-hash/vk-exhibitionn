@@ -6,15 +6,18 @@
  *   извлекает ID фото и отправляет событие router:openPhoto.
  * 
  * КАК ЭТО РАБОТАЕТ:
- *   1. Перебирает конфигурации камеры: мягкий environment, строгий, без указания
- *   2. При успехе — запускает сканирование с частотой SCAN_FPS
- *   3. При обнаружении QR — извлекает ID через Router._extractPhotoId
- *   4. Логи камеры сохраняются в cameraLogs для отправки в обратную связь
+ *   1. Получает список всех камер
+ *   2. Сортирует: задние камеры (back/задн) первыми
+ *   3. Перебирает камеры по deviceId пока одна не заработает
+ *   4. При обнаружении QR — извлекает ID через Router._extractPhotoId
+ * 
+ * Это решает проблему с телефонами где facingMode: 'environment'
+ * выбирает макро-камеру вместо обычной задней.
  * 
  * РАСШИРЕНИЕ:
- *   — Выбор из галереи (загрузка изображения с QR)
+ *   — Кнопка переключения камеры (фронтальная/задняя)
+ *   — Выбор из галереи
  *   — Звуковой сигнал при успешном сканировании
- *   — Визуальная рамка с анимацией
  */
 
 import EventBus from '../core/EventBus.js';
@@ -95,41 +98,58 @@ class QRScanner {
       return;
     }
 
-    // Проверяем камеры
+    // Получаем список камер
+    let cameras = [];
     try {
-      const devices = await Html5Qrcode.getCameras();
-      log(`найдено камер: ${devices.length}`);
-      cameraLogToBuffer(`камер: ${devices.length}`);
-      devices.forEach((d, i) => {
-        log(`  камера ${i}: ${d.label} (${d.id.substring(0, 20)}...)`);
-        cameraLogToBuffer(`камера ${i}: ${d.label} id=${d.id.substring(0, 20)}...`);
+      cameras = await Html5Qrcode.getCameras();
+      log(`найдено камер: ${cameras.length}`);
+      cameraLogToBuffer(`камер: ${cameras.length}`);
+      cameras.forEach((c, i) => {
+        log(`  камера ${i}: ${c.label} (${c.id.substring(0, 20)}...)`);
+        cameraLogToBuffer(`камера ${i}: ${c.label} id=${c.id.substring(0, 20)}...`);
       });
     } catch (e) {
       log(`список камер недоступен: ${e.message}`, 'warn');
       cameraLogToBuffer(`список камер: ${e.message}`);
     }
 
-    // Конфигурации камеры
-    const cameraConfigs = [
-      { name: 'environment (мягкий)', config: { facingMode: 'environment' } },
-      { name: 'environment (строгий)', config: { facingMode: { exact: 'environment' } } },
-      { name: 'без указания', config: {} },
-    ];
+    if (cameras.length === 0) {
+      log('камеры не найдены', 'error');
+      cameraLogToBuffer('камеры не найдены');
+      this._readerContainer.innerHTML = MSG_CAMERA_ERROR;
+      return;
+    }
+
+    /**
+     * Сортируем камеры: задние (back/задн) первыми.
+     * Это решает проблему с телефонами где facingMode: 'environment'
+     * выбирает макро-камеру с фиксированным фокусом на близком расстоянии.
+     */
+    const backCameras = cameras.filter(c => {
+      const label = c.label.toLowerCase();
+      return label.includes('back') || label.includes('задн') || label.includes('rear');
+    });
+    const otherCameras = cameras.filter(c => !backCameras.includes(c));
+    const orderedCameras = [...backCameras, ...otherCameras];
+
+    log(`задних камер: ${backCameras.length}, остальных: ${otherCameras.length}`);
+    cameraLogToBuffer(`задних: ${backCameras.length}, остальных: ${otherCameras.length}`);
 
     let started = false;
 
-    for (const { name, config } of cameraConfigs) {
+    for (const camera of orderedCameras) {
       if (started) break;
 
-      log(`пробую "${name}"...`);
-      cameraLogToBuffer(`пробую "${name}"`);
+      const cameraId = camera.id;
+      log(`пробую: ${camera.label} (${cameraId.substring(0, 20)}...)`);
+      cameraLogToBuffer(`пробую: ${camera.label} id=${cameraId.substring(0, 20)}...`);
 
       try {
         this._reader = new Html5Qrcode(READER_ID);
         this._isRunning = true;
 
         await this._reader.start(
-          config,
+          { deviceId: { exact: cameraId } },
           {
             fps: SCAN_FPS,
             qrbox: QRBOX_SIZE,
@@ -140,22 +160,22 @@ class QRScanner {
             cameraLogToBuffer(`считан: ${decodedText.substring(0, 50)}`);
             this._onScanSuccess(decodedText);
           },
-          () => {} // ошибки сканирования игнорируем
+          () => {}
         );
 
-        log(`успех с "${name}"`);
-        cameraLogToBuffer(`успех: "${name}"`);
+        log(`успех: ${camera.label}`);
+        cameraLogToBuffer(`успех: ${camera.label}`);
         started = true;
       } catch (err) {
-        log(`ошибка "${name}": ${err.message}`, 'warn');
-        cameraLogToBuffer(`ошибка "${name}": ${err.message} (${err.name || 'no name'})`);
+        log(`ошибка "${camera.label}": ${err.message}`, 'warn');
+        cameraLogToBuffer(`ошибка "${camera.label}": ${err.message}`);
         this._isRunning = false;
       }
     }
 
     if (!started) {
-      log('все конфиги провалились', 'error');
-      cameraLogToBuffer('ВСЕ КОНФИГИ ПРОВАЛИЛИСЬ');
+      log('все камеры провалились', 'error');
+      cameraLogToBuffer('ВСЕ КАМЕРЫ ПРОВАЛИЛИСЬ');
       this._readerContainer.innerHTML = MSG_CAMERA_ERROR;
     }
   }
@@ -186,7 +206,7 @@ class QRScanner {
     if (id) {
       EventBus.emit('router:openPhoto', id);
     } else {
-      alert(`QR-код считан, но ID фотографии не найден.\nСодержимое: ${decodedText}`);
+      alert(`Ошибка: QR-код не распознан как ссылка на фотографию.`);
       EventBus.emit('router:openGallery');
     }
   }
