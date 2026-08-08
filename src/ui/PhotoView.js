@@ -116,7 +116,7 @@ class PhotoView {
   // ПУБЛИЧНЫЙ API
   // ═══════════════════════════════════════
 
-  render(direction) {
+render(direction) {
     const photo = Store.getCurrentPhoto();
     if (!photo) return;
     if (!direction && this._currentPhotoId === photo.id) return;
@@ -133,7 +133,10 @@ class PhotoView {
     this._centerImage.style.transition = 'none';
     this._centerImage.style.opacity = '1';
 
-    this._hideCenterText();
+    // Скрываем текст только при открытии из галереи, не при свайпе
+    if (!direction) {
+      this._hideCenterText();
+    }
 
     if (hasPreview) {
       this._centerImage.src = previewUrl;
@@ -166,7 +169,17 @@ class PhotoView {
 
     this._resetTrackToCenter();
 
-    requestAnimationFrame(() => this._revealCenterText());
+    // Текст выезжает только при открытии из галереи
+    if (!direction) {
+      requestAnimationFrame(() => this._revealCenterText());
+    }
+  }
+
+  reset() {
+    this._currentPhotoId = null;
+    this._centerImage.style.transition = 'none';
+    this._centerImage.style.opacity = '1';
+    this._centerFullImage.src = '';
   }
 
   resetSwipe() {
@@ -258,7 +271,7 @@ class PhotoView {
     img.src = photo.imagePreviewUrl || photo.imageUrl;
     wrapper.appendChild(img);
     const info = document.createElement('div');
-    info.className = 'photo-info';
+    info.className = 'photo-info revealed';
     container.appendChild(wrapper);
     container.appendChild(info);
     if (!this._infoPanel) this._infoPanel = new InfoPanel();

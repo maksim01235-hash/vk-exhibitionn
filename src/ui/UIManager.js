@@ -111,6 +111,7 @@ class UIManager {
     this._hideFeedbackScreen();
     this._qrScanner.stop();
     this._photoView.resetSwipe();
+    this._photoView.reset(); // ← сброс состояния фото
     this._galleryView.render();
     this._setFeedbackBtnShifted(false);
     if (window.location.hash) {
