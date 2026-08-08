@@ -1,5 +1,18 @@
 /**
  * QRScanner — сканер QR-кодов через камеру.
+ * 
+ * Использует библиотеку Html5Qrcode.
+ * При успешном сканировании извлекает ID фотографии и переходит к ней.
+ * Если ID не найден — возвращает в галерею.
+ * 
+ * Поддерживаемые форматы QR:
+ *   - https://vk.com/app54708970/#1
+ *   - 1 (просто число)
+ * 
+ * При расширении можно добавить:
+ *   - Выбор из галереи (загрузка изображения с QR)
+ *   - Звуковой сигнал при успешном сканировании
+ *   - Визуальная рамка с анимацией
  */
 
 import EventBus from '../core/EventBus.js';
@@ -9,10 +22,19 @@ import Router from '../core/Router.js';
 // КОНСТАНТЫ
 // ═══════════════════════════════════════
 
+/** Настройки камеры: задняя (environment) или передняя (user) */
+const CAMERA_FACING = 'environment';
+
+/** Частота сканирования (кадров в секунду) */
 const SCAN_FPS = 10;
+
+/** Размер области сканирования (px) */
 const QRBOX_SIZE = { width: 250, height: 250 };
+
+/** CSS-селектор контейнера для сканера */
 const READER_ID = 'qr-reader';
 
+/** Сообщения */
 const MSG_LIB_NOT_LOADED = '<p class="qr-error">Библиотека сканера не загружена</p>';
 const MSG_CAMERA_ERROR = `
   <p class="qr-error">Не удалось запустить камеру</p>
@@ -21,15 +43,24 @@ const MSG_CAMERA_ERROR = `
 
 class QRScanner {
   constructor() {
+    /** @type {Html5Qrcode|null} Экземпляр сканера */
     this._reader = null;
-    this._readerContainer = document.getElementById(READER_ID);
-    this._isRunning = false;
-    this._cameras = [];
-    this._currentCameraIndex = -1;
 
-    this._onScanSuccess = this._onScanSuccess.bind(this);
+    /** @type {HTMLElement} Контейнер для вставки видео */
+    this._readerContainer = document.getElementById(READER_ID);
+
+    /** @type {boolean} Запущен ли сканер */
+    this._isRunning = false;
   }
 
+  // ═══════════════════════════════════════
+  // ПУБЛИЧНЫЙ API
+  // ═══════════════════════════════════════
+
+  /**
+   * Запустить сканер. Если уже запущен — выходит.
+   * При ошибке камеры показывает сообщение пользователю.
+   */
   async start() {
     if (this._isRunning) return;
 
@@ -42,95 +73,79 @@ class QRScanner {
 
     try {
       this._reader = new Html5Qrcode(READER_ID);
-      const allCameras = await Html5Qrcode.getCameras();
-
-      if (allCameras.length === 0) {
-        this._readerContainer.innerHTML = MSG_CAMERA_ERROR;
-        return;
+      
+      // Получаем список камер
+      const cameras = await Html5Qrcode.getCameras();
+      
+      let cameraId = { facingMode: CAMERA_FACING };
+      
+      if (cameras && cameras.length > 0) {
+        // Ищем заднюю камеру с самым высоким разрешением (обычно основная)
+        const backCameras = cameras.filter(c => c.id.includes('back') || c.id.includes('rear') || c.id === '0');
+        if (backCameras.length > 0) {
+          // Берём камеру с самым длинным id (обычно основная) или первую
+          const mainCamera = backCameras.reduce((a, b) => 
+            (a.id.length >= b.id.length) ? a : b
+          );
+          cameraId = { deviceId: mainCamera.id };
+        }
       }
+      
+      this._isRunning = true;
 
-      // Сохраняем все камеры
-      this._cameras = allCameras;
-
-      // Ищем заднюю камеру (back, rear, environment, или id = '0')
-      let backIndex = this._cameras.findIndex(c => 
-        c.id.toLowerCase().includes('back') || 
-        c.id.toLowerCase().includes('rear') ||
-        c.id === '0'
+      await this._reader.start(
+        cameraId,
+        {
+          fps: SCAN_FPS,
+          qrbox: QRBOX_SIZE,
+        },
+        (decodedText) => this._onScanSuccess(decodedText),
+        () => {}
       );
-      
-      // Если не нашли — берём первую
-      if (backIndex === -1) backIndex = 0;
-      
-      this._currentCameraIndex = backIndex;
-
-      // Показываем кнопку если камер > 1
-      const switchBtn = document.getElementById('switch-camera-btn');
-      if (switchBtn) {
-        switchBtn.classList.toggle('hidden', this._cameras.length <= 1);
-        switchBtn.onclick = () => this._switchCamera();
-      }
-
-      await this._startCamera(this._cameras[this._currentCameraIndex].id);
     } catch (err) {
       console.log('QRScanner: камера недоступна:', err.message);
       this._isRunning = false;
       this._readerContainer.innerHTML = MSG_CAMERA_ERROR;
     }
   }
-  async _startCamera(cameraId) {
-    if (this._isRunning) {
-      await this._reader.stop();
-    }
 
-    this._isRunning = true;
-
-    await this._reader.start(
-      { deviceId: { exact: cameraId } },
-      {
-        fps: SCAN_FPS,
-        qrbox: QRBOX_SIZE,
-      },
-      this._onScanSuccess,
-      () => {}
-    );
-  }
-
-  async _switchCamera() {
-    if (this._cameras.length < 2) return;
-
-    this._currentCameraIndex = (this._currentCameraIndex + 1) % this._cameras.length;
-    const cameraId = this._cameras[this._currentCameraIndex].id;
-    console.log('QRScanner: переключаю на камеру', this._currentCameraIndex, cameraId);
+  /**
+   * Остановить сканер.
+   * Безопасно — можно вызывать даже если сканер не запущен.
+   */
+  stop() {
+    if (!this._reader || !this._isRunning) return;
 
     try {
-      await this._startCamera(cameraId);
-    } catch (err) {
-      console.log('QRScanner: не удалось переключить камеру:', err.message);
-      // Возвращаемся на предыдущую
-      this._currentCameraIndex = (this._currentCameraIndex - 1 + this._cameras.length) % this._cameras.length;
+      this._reader.stop().catch(() => {});
+    } catch (e) {
+      // Игнорируем ошибки остановки
     }
+    this._isRunning = false;
   }
 
+  // ═══════════════════════════════════════
+  // ОБРАБОТКА РЕЗУЛЬТАТА
+  // ═══════════════════════════════════════
+
+  /**
+   * Обработка успешного сканирования.
+   * Извлекает ID фото из распознанного текста.
+   * 
+   * @param {string} decodedText — содержимое QR-кода
+   */
   _onScanSuccess(decodedText) {
     this.stop();
 
+    // Извлекаем ID фото (делегируем Router)
     const id = Router._extractPhotoId(decodedText);
+    console.log('QRScanner: ID =', id);
 
     if (id) {
       EventBus.emit('router:openPhoto', id);
     } else {
       alert(`QR-код считан, но ID фотографии не найден.\nСодержимое: ${decodedText}`);
       EventBus.emit('router:openGallery');
-    }
-  }
-
-  stop() {
-    if (this._reader && this._isRunning) {
-      try {
-        this._reader.stop().catch(() => {});
-      } catch (e) {}
-      this._isRunning = false;
     }
   }
 }
