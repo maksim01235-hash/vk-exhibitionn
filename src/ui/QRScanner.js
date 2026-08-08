@@ -6,10 +6,11 @@
  *   извлекает ID фото и отправляет событие router:openPhoto.
  * 
  * КАК ЭТО РАБОТАЕТ:
- *   1. Получает список всех камер
+ *   1. При первом запуске получает список камер и кеширует его
  *   2. Сортирует: задние камеры (back/задн) первыми
  *   3. Перебирает камеры по deviceId пока одна не заработает
- *   4. При обнаружении QR — извлекает ID через Router._extractPhotoId
+ *   4. Сохраняет ID рабочей камеры для мгновенного запуска в следующий раз
+ *   5. При обнаружении QR — извлекает ID через Router._extractPhotoId
  * 
  * Это решает проблему с телефонами где facingMode: 'environment'
  * выбирает макро-камеру вместо обычной задней.
@@ -73,6 +74,13 @@ class QRScanner {
     this._reader = null;
     this._readerContainer = document.getElementById(READER_ID);
     this._isRunning = false;
+    
+    /** @type {string|null} ID последней успешной камеры */
+    this._lastCameraId = null;
+    
+    /** @type {Array|null} Кешированный список камер */
+    this._cachedCameras = null;
+    
     log('создан');
   }
 
@@ -80,7 +88,7 @@ class QRScanner {
   // ПУБЛИЧНЫЙ API
   // ═══════════════════════════════════════
 
-   async start() {
+  async start() {
     if (this._isRunning) return;
     
     // Полный сброс предыдущего
@@ -94,8 +102,6 @@ class QRScanner {
     log('запуск...');
     log(`userAgent: ${navigator.userAgent.substring(0, 80)}`);
 
-    this._readerContainer.innerHTML = '';
-
     if (typeof Html5Qrcode === 'undefined') {
       log('Html5Qrcode не загружен', 'error');
       cameraLogToBuffer('ОШИБКА: Html5Qrcode не загружен');
@@ -103,19 +109,25 @@ class QRScanner {
       return;
     }
 
-    // Получаем список камер
-    let cameras = [];
-    try {
-      cameras = await Html5Qrcode.getCameras();
-      log(`найдено камер: ${cameras.length}`);
-      cameraLogToBuffer(`камер: ${cameras.length}`);
-      cameras.forEach((c, i) => {
-        log(`  камера ${i}: ${c.label} (${c.id.substring(0, 20)}...)`);
-        cameraLogToBuffer(`камера ${i}: ${c.label} id=${c.id.substring(0, 20)}...`);
-      });
-    } catch (e) {
-      log(`список камер недоступен: ${e.message}`, 'warn');
-      cameraLogToBuffer(`список камер: ${e.message}`);
+    // Получаем список камер (кешируем после первого получения)
+    let cameras = this._cachedCameras;
+    if (!cameras) {
+      try {
+        cameras = await Html5Qrcode.getCameras();
+        this._cachedCameras = cameras;
+        log(`найдено камер: ${cameras.length}`);
+        cameraLogToBuffer(`камер: ${cameras.length}`);
+        cameras.forEach((c, i) => {
+          log(`  камера ${i}: ${c.label} (${c.id.substring(0, 20)}...)`);
+          cameraLogToBuffer(`камера ${i}: ${c.label} id=${c.id.substring(0, 20)}...`);
+        });
+      } catch (e) {
+        log(`список камер недоступен: ${e.message}`, 'warn');
+        cameraLogToBuffer(`список камер: ${e.message}`);
+        cameras = [];
+      }
+    } else {
+      log(`использую кеш камер: ${cameras.length}`);
     }
 
     if (cameras.length === 0) {
@@ -125,41 +137,18 @@ class QRScanner {
       return;
     }
 
-    /**
-     * Сортируем камеры: задние (back/задн) первыми.
-     * Это решает проблему с телефонами где facingMode: 'environment'
-     * выбирает макро-камеру с фиксированным фокусом на близком расстоянии.
-     */
-    const backCameras = cameras.filter(c => {
-      const label = c.label.toLowerCase();
-      return label.includes('back') || label.includes('задн') || label.includes('rear');
-    });
-    const otherCameras = cameras.filter(c => !backCameras.includes(c));
-    const orderedCameras = [...backCameras, ...otherCameras];
-
-    log(`задних камер: ${backCameras.length}, остальных: ${otherCameras.length}`);
-    cameraLogToBuffer(`задних: ${backCameras.length}, остальных: ${otherCameras.length}`);
-
     let started = false;
 
-    for (const camera of orderedCameras) {
-      if (started) break;
-
-      const cameraId = camera.id;
-      log(`пробую: ${camera.label} (${cameraId.substring(0, 20)}...)`);
-      cameraLogToBuffer(`пробую: ${camera.label} id=${cameraId.substring(0, 20)}...`);
-
+    // Если есть проверенная камера — пробуем её первой
+    if (this._lastCameraId) {
+      log(`пробую сохранённую камеру: ${this._lastCameraId.substring(0, 20)}...`);
+      cameraLogToBuffer(`пробую сохранённую: ${this._lastCameraId.substring(0, 20)}...`);
       try {
         this._reader = new Html5Qrcode(READER_ID);
         this._isRunning = true;
-
         await this._reader.start(
-          { deviceId: { exact: cameraId } },
-          {
-            fps: SCAN_FPS,
-            qrbox: QRBOX_SIZE,
-            aspectRatio: 1.0,
-          },
+          { deviceId: { exact: this._lastCameraId } },
+          { fps: SCAN_FPS, qrbox: QRBOX_SIZE, aspectRatio: 1.0 },
           (decodedText) => {
             log(`считан QR: ${decodedText.substring(0, 50)}`);
             cameraLogToBuffer(`считан: ${decodedText.substring(0, 50)}`);
@@ -167,14 +156,57 @@ class QRScanner {
           },
           () => {}
         );
-
-        log(`успех: ${camera.label}`);
-        cameraLogToBuffer(`успех: ${camera.label}`);
+        log('успех с сохранённой камерой');
+        cameraLogToBuffer('успех с сохранённой');
         started = true;
       } catch (err) {
-        log(`ошибка "${camera.label}": ${err.message}`, 'warn');
-        cameraLogToBuffer(`ошибка "${camera.label}": ${err.message}`);
+        log(`сохранённая камера не сработала: ${err.message}`);
+        cameraLogToBuffer(`сохранённая не сработала: ${err.message}`);
         this._isRunning = false;
+        this._lastCameraId = null;
+      }
+    }
+
+    // Если сохранённая не сработала — перебираем
+    if (!started) {
+      const backCameras = cameras.filter(c => {
+        const label = c.label.toLowerCase();
+        return label.includes('back') || label.includes('задн') || label.includes('rear');
+      });
+      const otherCameras = cameras.filter(c => !backCameras.includes(c));
+      const orderedCameras = [...backCameras, ...otherCameras];
+
+      log(`задних камер: ${backCameras.length}, остальных: ${otherCameras.length}`);
+      cameraLogToBuffer(`задних: ${backCameras.length}, остальных: ${otherCameras.length}`);
+
+      for (const camera of orderedCameras) {
+        if (started) break;
+        const cameraId = camera.id;
+        log(`пробую: ${camera.label} (${cameraId.substring(0, 20)}...)`);
+        cameraLogToBuffer(`пробую: ${camera.label} id=${cameraId.substring(0, 20)}...`);
+
+        try {
+          this._reader = new Html5Qrcode(READER_ID);
+          this._isRunning = true;
+          await this._reader.start(
+            { deviceId: { exact: cameraId } },
+            { fps: SCAN_FPS, qrbox: QRBOX_SIZE, aspectRatio: 1.0 },
+            (decodedText) => {
+              log(`считан QR: ${decodedText.substring(0, 50)}`);
+              cameraLogToBuffer(`считан: ${decodedText.substring(0, 50)}`);
+              this._onScanSuccess(decodedText);
+            },
+            () => {}
+          );
+          log(`успех: ${camera.label}`);
+          cameraLogToBuffer(`успех: ${camera.label}`);
+          this._lastCameraId = cameraId;
+          started = true;
+        } catch (err) {
+          log(`ошибка "${camera.label}": ${err.message}`, 'warn');
+          cameraLogToBuffer(`ошибка "${camera.label}": ${err.message}`);
+          this._isRunning = false;
+        }
       }
     }
 
@@ -182,29 +214,6 @@ class QRScanner {
       log('все камеры провалились', 'error');
       cameraLogToBuffer('ВСЕ КАМЕРЫ ПРОВАЛИЛИСЬ');
       this._readerContainer.innerHTML = MSG_CAMERA_ERROR;
-    }
-  }
-
-  stop() {
-    log('остановка');
-    cameraLogToBuffer('остановка');
-    
-    // Очищаем контейнер чтобы убрать видео
-    if (this._readerContainer) {
-      this._readerContainer.innerHTML = '';
-    }
-    
-    if (this._reader && this._isRunning) {
-      try {
-        this._reader.stop()
-          .then(() => { this._isRunning = false; })
-          .catch(() => { this._isRunning = false; });
-      } catch (e) {
-        log(`ошибка остановки: ${e.message}`, 'warn');
-        this._isRunning = false;
-      }
-    } else {
-      this._isRunning = false;
     }
   }
 
@@ -231,7 +240,7 @@ class QRScanner {
     log('остановка');
     cameraLogToBuffer('остановка');
     
-    this._isRunning = false; // Сразу сбрасываем флаг
+    this._isRunning = false;
     
     if (this._readerContainer) {
       this._readerContainer.innerHTML = '';
@@ -239,8 +248,8 @@ class QRScanner {
     
     if (this._reader) {
       const reader = this._reader;
-      this._reader = null; // Обнуляем сразу
-      reader.stop().catch(() => {}); // Молча глотаем ошибку
+      this._reader = null;
+      reader.stop().catch(() => {});
     }
   }
 }
