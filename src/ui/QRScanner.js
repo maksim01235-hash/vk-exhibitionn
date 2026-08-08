@@ -80,7 +80,7 @@ class QRScanner {
     
     /** @type {Array|null} Кешированный список камер */
     this._cachedCameras = null;
-    
+        log(`создан, _lastCameraId=${this._lastCameraId}, _cachedCameras=${this._cachedCameras}`);
     log('создан');
   }
 
@@ -215,6 +215,7 @@ class QRScanner {
       cameraLogToBuffer('ВСЕ КАМЕРЫ ПРОВАЛИЛИСЬ');
       this._readerContainer.innerHTML = MSG_CAMERA_ERROR;
     }
+        log(`после start, _lastCameraId=${this._lastCameraId?.substring(0, 20)}, _cachedCameras=${this._cachedCameras?.length}`);
   }
 
   // ═══════════════════════════════════════
