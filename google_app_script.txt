@@ -1,0 +1,23 @@
+function doPost(e) {
+  const ss = SpreadsheetApp.openById('1anNLwL5lPj7J3JOLjMu4ITfHtG5y1ZwvqeiJ93B3GoY');
+  let sheet = ss.getSheetByName('обратная связь');
+  
+  if (!sheet) {
+    sheet = ss.insertSheet('обратная связь');
+    sheet.appendRow(['Дата', 'Имя', 'Почта', 'Сообщение', 'Оценка', 'Логи']);
+  }
+  
+  const data = JSON.parse(e.postData.contents);
+  const logs = data.logs ? String(data.logs).replace(/[\r\n]+/g, ' | ') : '';
+  
+  sheet.appendRow([new Date(), data.name, data.email, data.message, data.rating, logs]);
+  
+  const lastRow = sheet.getLastRow();
+  const logCell = sheet.getRange(lastRow, 6); // Столбец F — Логи
+  logCell.setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  sheet.setRowHeight(lastRow, 21);
+  
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: 'ok' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}

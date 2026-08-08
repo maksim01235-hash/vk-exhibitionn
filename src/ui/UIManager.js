@@ -1,16 +1,5 @@
 /**
  * UIManager — управление экранами приложения.
- * 
- * НАЗНАЧЕНИЕ:
- *   Переключает экраны: галерея, фото (слайдер), QR-сканер, обратная связь.
- *   Обрабатывает навигационные события от Router.
- * 
- * СХЕМА НАВИГАЦИИ:
- *   Галерея ←→ Фото ←→ QR-сканер
- *   Галерея ←→ Обратная связь
- *   Фото      ←→ Обратная связь
- *   QR-сканер ←→ Обратная связь
- *   Галерея ←→ Фото (по ссылке /#id)
  */
 
 import Store from '../core/Store.js';
@@ -22,14 +11,8 @@ import FeedbackPrompt from '../utils/FeedbackPrompt.js';
 import CONFIG from '../config.js';
 import { createLogger, getLogs } from '../utils/Logger.js';
 
-// ═══════════════════════════════════════
-// КОНСТАНТЫ
-// ═══════════════════════════════════════
-
-/** Включить логирование */
 const DEBUG = true;
 
-/** ID экранов */
 const SCREENS = {
   gallery:  'gallery-screen',
   photo:    'photo-screen',
@@ -37,12 +20,7 @@ const SCREENS = {
   feedback: 'feedback-screen',
 };
 
-/** CSS-класс для смещения кнопки обратной связи на экране фото */
 const SHIFTED_CLASS = 'shifted';
-
-// ═══════════════════════════════════════
-// ЛОГГЕР
-// ═══════════════════════════════════════
 
 const log = createLogger('UIManager', DEBUG);
 
@@ -66,10 +44,6 @@ class UIManager {
     log('синглтон создан');
   }
 
-  // ═══════════════════════════════════════
-  // ИНИЦИАЛИЗАЦИЯ
-  // ═══════════════════════════════════════
-
   init() {
     this._galleryView = new GalleryView();
     this._photoView = new PhotoView();
@@ -82,7 +56,6 @@ class UIManager {
     EventBus.on('router:openPhoto', (id) => {
       if (Store.getCount() === 0) {
         this._pendingPhotoId = id;
-        log(`фото #${id} отложено до загрузки данных`);
       } else if (!this._initialized || this._currentScreen !== 'photo') {
         this._pendingPhotoId = null;
         this.showPhoto(id);
@@ -105,14 +78,8 @@ class UIManager {
     log('инициализация завершена');
   }
 
-  // ═══════════════════════════════════════
-  // ДАННЫЕ
-  // ═══════════════════════════════════════
-
   _onDataLoaded() {
     this._hideLoading();
-    log('данные загружены, определяю экран');
-
     if (this._pendingPhotoId) {
       const id = this._pendingPhotoId;
       this._pendingPhotoId = null;
@@ -120,7 +87,6 @@ class UIManager {
       this.showPhoto(id);
       return;
     }
-
     const hash = window.location.hash;
     if (hash && hash.length > 1) {
       const id = hash.substring(1).replace(/^\//, '');
@@ -130,7 +96,6 @@ class UIManager {
         return;
       }
     }
-
     if (!this._initialized) {
       this._initialized = true;
       this.showGallery();
@@ -139,16 +104,11 @@ class UIManager {
 
   _onDataError() {
     this._hideLoading();
-    log('ошибка загрузки данных', 'error');
     if (!this._initialized) {
       this._initialized = true;
       this.showGallery();
     }
   }
-
-  // ═══════════════════════════════════════
-  // НАВИГАЦИЯ
-  // ═══════════════════════════════════════
 
   showGallery() {
     log('→ галерея');
@@ -162,9 +122,7 @@ class UIManager {
     this._photoView.reset();
     this._galleryView.render();
     this._setFeedbackBtnShifted(false);
-    if (window.location.hash) {
-      history.replaceState(null, '', window.location.pathname);
-    }
+    if (window.location.hash) history.replaceState(null, '', window.location.pathname);
     FeedbackPrompt.cancel();
   }
 
@@ -184,7 +142,6 @@ class UIManager {
   showQR() {
     log('→ QR-сканер');
     FeedbackPrompt.cancel(true);
-
     this._screenBeforeQR = this._currentScreen;
     this._currentScreen = 'qr';
     this._galleryScreen.classList.add('hidden');
@@ -208,10 +165,6 @@ class UIManager {
     }
   }
 
-  // ═══════════════════════════════════════
-  // КНОПКА ОБРАТНОЙ СВЯЗИ
-  // ═══════════════════════════════════════
-
   _setFeedbackBtnShifted(shifted) {
     const fb = document.getElementById('feedback-btn');
     if (!fb) return;
@@ -219,19 +172,12 @@ class UIManager {
     else fb.classList.remove(SHIFTED_CLASS);
   }
 
-  // ═══════════════════════════════════════
-  // ОБРАТНАЯ СВЯЗЬ
-  // ═══════════════════════════════════════
-
   _openFeedback() {
     log('→ обратная связь');
     FeedbackPrompt.cancel();
-
     const fb = document.getElementById('feedback-btn');
     if (fb) fb.classList.add('hidden');
-
     this._screenBeforeFeedback = this._currentScreen;
-
     this._galleryScreen.classList.add('hidden');
     this._photoScreen.classList.add('hidden');
     this._qrScreen.classList.add('hidden');
@@ -240,9 +186,7 @@ class UIManager {
     this._currentScreen = 'feedback';
 
     let feedbackScreen = document.getElementById(SCREENS.feedback);
-    if (!feedbackScreen) {
-      feedbackScreen = this._createFeedbackScreen();
-    }
+    if (!feedbackScreen) feedbackScreen = this._createFeedbackScreen();
 
     this._resetFeedbackForm();
     feedbackScreen.classList.remove('hidden');
@@ -266,13 +210,13 @@ class UIManager {
         <form id="feedback-form" class="feedback-form">
           <input type="text" id="feedback-name" class="feedback-input" placeholder="Ваше имя" required />
           <input type="email" id="feedback-email" class="feedback-input" placeholder="Ваша почта" required />
-          <textarea id="feedback-message" class="feedback-textarea" placeholder="Ваше сообщение..." rows="5" required></textarea>
+          <textarea id="feedback-message" class="feedback-textarea" placeholder="Ваше сообщение..." rows="5"></textarea>
           <div class="feedback-stars" id="feedback-stars">
-            <span class="star" data-value="1">☆</span>
-            <span class="star" data-value="2">☆</span>
-            <span class="star" data-value="3">☆</span>
-            <span class="star" data-value="4">☆</span>
-            <span class="star" data-value="5">☆</span>
+            <span class="star" data-value="1"><i data-lucide="star"></i></span>
+            <span class="star" data-value="2"><i data-lucide="star"></i></span>
+            <span class="star" data-value="3"><i data-lucide="star"></i></span>
+            <span class="star" data-value="4"><i data-lucide="star"></i></span>
+            <span class="star" data-value="5"><i data-lucide="star"></i></span>
           </div>
           <input type="hidden" id="feedback-rating" value="0" />
           <button type="submit" id="feedback-submit" class="feedback-submit-btn">
@@ -294,17 +238,37 @@ class UIManager {
     `;
     document.getElementById('app').appendChild(screen);
 
+    // Инициализируем Lucide иконки (все на странице)
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+
     // Звёзды рейтинга
     const stars = screen.querySelectorAll('#feedback-stars .star');
     const ratingInput = screen.querySelector('#feedback-rating');
+    let currentRating = 0;
+
+    const updateStars = () => {
+      stars.forEach((s, i) => {
+        const svg = s.querySelector('svg');
+        if (!svg) return;
+        if (i < currentRating) {
+          svg.setAttribute('fill', '#FFD700');
+          svg.setAttribute('stroke', '#FFD700');
+          s.classList.add('active');
+        } else {
+          svg.setAttribute('fill', 'none');
+          svg.setAttribute('stroke', 'currentColor');
+          s.classList.remove('active');
+        }
+      });
+    };
+
     stars.forEach(star => {
       star.addEventListener('click', () => {
-        const value = parseInt(star.dataset.value);
-        ratingInput.value = value;
-        stars.forEach((s, i) => {
-          s.textContent = i < value ? '★' : '☆';
-          s.classList.toggle('active', i < value);
-        });
+        currentRating = parseInt(star.dataset.value);
+        ratingInput.value = currentRating;
+        updateStars();
       });
     });
 
@@ -312,12 +276,9 @@ class UIManager {
     screen.querySelector('#close-feedback-btn').addEventListener('click', () => {
       log('закрытие обратной связи');
       screen.classList.add('hidden');
-
       const fb = document.getElementById('feedback-btn');
       if (fb) fb.classList.remove('hidden');
-
       this._resetFeedbackForm();
-
       if (this._screenBeforeFeedback === 'photo') {
         this._currentScreen = 'photo';
         this._galleryScreen.classList.add('hidden');
@@ -373,23 +334,41 @@ class UIManager {
     if (!name)     { nameInput.classList.add('error');    hasError = true; }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                     emailInput.classList.add('error');   hasError = true; }
-    if (!message)  { messageInput.classList.add('error'); hasError = true; }
-    if (hasError) {
-      log('валидация не пройдена', 'warn');
-      return;
+    if (rating === '0') {
+      // Подсвечиваем звёзды красным если оценка не выбрана
+      document.getElementById('feedback-stars').classList.add('error');
+      hasError = true;
+    } else {
+      document.getElementById('feedback-stars').classList.remove('error');
     }
+    if (hasError) { log('валидация не пройдена', 'warn'); return; }
 
     this._setSubmitLoading(submitBtn, true);
 
     let fullMessage = message;
-    if (rating !== '0') {
-      fullMessage += `\nОценка: ${rating}/5`;
-    }
+    if (rating !== '0') fullMessage += `\nОценка: ${rating}/5`;
 
     const appLogs = getLogs();
     const cameraLogs = getCameraLogs();
     if (appLogs) fullMessage += '\n\n--- ЛОГИ ПРИЛОЖЕНИЯ ---\n' + appLogs;
     if (cameraLogs) fullMessage += '\n\n--- ЛОГИ КАМЕРЫ ---\n' + cameraLogs;
+
+    // Сохраняем в Google Таблицу (фоном, ошибки игнорируем)
+    // Сохраняем в Google Таблицу
+    if (CONFIG.FEEDBACK_SHEET?.SCRIPT_URL) {
+      fetch(CONFIG.FEEDBACK_SHEET.SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name,
+          email: email,
+          message: message,
+          rating: rating,
+          logs: (appLogs || '') + '\n' + (cameraLogs || ''),
+        }),
+      }).catch(() => {});
+    }
 
     const templateParams = {
       name: name,
@@ -434,16 +413,21 @@ class UIManager {
     const success = document.getElementById('feedback-success');
     const error = document.getElementById('feedback-error');
     const submitBtn = document.getElementById('feedback-submit');
-    if (form) {
-      form.classList.remove('hidden');
-      form.reset();
-    }
+    if (form) { form.classList.remove('hidden'); form.reset(); }
     if (success) success.classList.add('hidden');
     if (error) error.classList.add('hidden');
     if (submitBtn) this._setSubmitLoading(submitBtn, false);
+
     // Сброс звёзд
     const stars = document.querySelectorAll('#feedback-stars .star');
-    stars.forEach(s => { s.textContent = '☆'; s.classList.remove('active'); });
+    stars.forEach(s => {
+      const svg = s.querySelector('svg');
+      if (svg) {
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+      }
+      s.classList.remove('active');
+    });
     const ratingInput = document.getElementById('feedback-rating');
     if (ratingInput) ratingInput.value = '0';
   }

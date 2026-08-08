@@ -71,23 +71,26 @@ const EXHIBITION = {
 // ═══════════════════════════════════════
 
 const EMAILJS = {
-  /**
-   * Service ID из EmailJS.
-   * Где взять: Email Services → выбрать сервис → скопировать Service ID.
-   */
   SERVICE_ID: 'service_ym4iqcu',
-
-  /**
-   * Template ID из EmailJS.
-   * Где взять: Email Templates → выбрать шаблон → скопировать Template ID.
-   */
   TEMPLATE_ID: 'template_x16we4g',
-
-  /**
-   * Public Key из EmailJS.
-   * Где взять: Account → API Keys → Public Key.
-   */
   PUBLIC_KEY: 'oRCD9VBQMxpxKkwIm',
+};
+
+// ═══════════════════════════════════════
+// ОБРАТНАЯ СВЯЗЬ (Google Таблица)
+// ═══════════════════════════════════════
+
+const FEEDBACK_SHEET = {
+  /**
+   * URL Google Apps Script для сохранения обратной связи в таблицу.
+   * Как получить:
+   *   1. script.google.com → создать проект
+   *   2. Вставить код doPost (см. документацию)
+   *   3. Развернуть → Новое развертывание → Веб-приложение
+   *   4. Доступ: «Все, даже анонимные»
+   *   5. Скопировать URL (оканчивается на /exec)
+   */
+SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwHJ2dg6pFCrOGU6VwwBC6zLlPc-uWW7x6svUqb8Qki5IH9mBVfRV2VpPrq4DBUryoESw/exec',
 };
 
 // ═══════════════════════════════════════
@@ -95,26 +98,8 @@ const EMAILJS = {
 // ═══════════════════════════════════════
 
 const TECH = {
-  /**
-   * Время жизни кеша данных в минутах.
-   * ⚠ Сейчас НЕ ИСПОЛЬЗУЕТСЯ — данные загружаются при каждом открытии.
-   * Оставлено для будущей реализации фонового обновления.
-   */
   CACHE_TTL: 30,
-
-  /**
-   * Количество фото на странице в галерее.
-   * ⚠ Сейчас НЕ ИСПОЛЬЗУЕТСЯ — все фото отображаются сразу.
-   * Оставлено для будущей реализации пагинации.
-   */
   PHOTOS_PER_PAGE: 50,
-
-  /**
-   * Версия Service Worker кеша.
-   * Увеличьте при обновлении статических файлов (CSS, JS, HTML)
-   * чтобы сбросить кеш у пользователей.
-   * Синхронизировать с CACHE_NAME в sw.js.
-   */
   SW_CACHE_VERSION: 'v7',
 };
 
@@ -125,6 +110,7 @@ const TECH = {
 const CONFIG = {
   EXHIBITION,
   EMAILJS,
+  FEEDBACK_SHEET,
   TECH,
 };
 

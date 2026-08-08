@@ -206,7 +206,7 @@ class QRScanner {
     if (id) {
       EventBus.emit('router:openPhoto', id);
     } else {
-      alert(`Ошибка: QR-код не распознан как ссылка на фотографию.`);
+      alert(`QR-код считан, но ID фотографии не найден.\nСодержимое: ${decodedText}`);
       EventBus.emit('router:openGallery');
     }
   }
