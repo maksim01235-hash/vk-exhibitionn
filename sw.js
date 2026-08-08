@@ -3,12 +3,13 @@
  * 
  * СТРАТЕГИИ КЕШИРОВАНИЯ:
  *   - Статические файлы: кешируются при установке (install)
- *   - Google Sheets / EmailJS: сеть → кеш, при ошибке — кеш
+ *   - Google Sheets (GET): сеть → кеш, при ошибке — кеш
+ *   - EmailJS (POST): не кешируется — проходит напрямую
  *   - Изображения: кеш → сеть (мгновенная отдача, фоновое обновление)
  *   - Всё остальное: кеш → сеть → фоновое обновление
  * 
  * ОБНОВЛЕНИЕ КЕША:
- *   Увеличьте CACHE_NAME (v7 → v8) при изменении статических файлов.
+ *   Увеличьте CACHE_NAME (v9 → v10) при изменении статических файлов.
  *   Старый кеш удалится автоматически при активации.
  * 
  * ОТЛАДКА:
@@ -122,9 +123,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   const dest = event.request.destination;
+  const method = event.request.method;
 
-  // ── Google Sheets / EmailJS: сеть → кеш ──
-  if (url.hostname === 'docs.google.com' || url.hostname === 'api.emailjs.com') {
+  // ── EmailJS (POST): не кешируем, пропускаем напрямую ──
+  if (url.hostname === 'api.emailjs.com') {
+    return; // SW не вмешивается
+  }
+
+  // ── Google Sheets (GET): сеть → кеш ──
+  if (url.hostname === 'docs.google.com') {
     log(`${url.hostname} — сеть → кеш`);
     event.respondWith(
       fetch(event.request)

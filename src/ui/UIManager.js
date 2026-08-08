@@ -20,8 +20,7 @@ import PhotoView from './PhotoView.js';
 import QRScanner, { getCameraLogs } from './QRScanner.js';
 import FeedbackPrompt from '../utils/FeedbackPrompt.js';
 import CONFIG from '../config.js';
-import { createLogger } from '../utils/Logger.js';
-import { getLogs } from '../utils/Logger.js';
+import { createLogger, getLogs } from '../utils/Logger.js';
 
 // ═══════════════════════════════════════
 // КОНСТАНТЫ
@@ -77,7 +76,6 @@ class UIManager {
     this._qrScanner = new QRScanner();
     log('компоненты созданы');
 
-    // Подписки на навигацию
     EventBus.on('router:openGallery', () => this.showGallery());
     EventBus.on('router:openQR', () => this.showQR());
 
@@ -94,7 +92,6 @@ class UIManager {
     EventBus.on('photos:loaded', () => this._onDataLoaded());
     EventBus.on('photos:error', () => this._onDataError());
 
-    // Кнопки
     document.getElementById('scan-btn-gallery').addEventListener('click', () => this.showQR());
     document.getElementById('scan-btn-photo').addEventListener('click', () => this.showQR());
     document.getElementById('back-to-gallery-btn').addEventListener('click', () => this.showGallery());
@@ -120,7 +117,6 @@ class UIManager {
       const id = this._pendingPhotoId;
       this._pendingPhotoId = null;
       this._initialized = true;
-      log(`отложенный переход к фото #${id}`);
       this.showPhoto(id);
       return;
     }
@@ -130,7 +126,6 @@ class UIManager {
       const id = hash.substring(1).replace(/^\//, '');
       if (id && Store.navigateToId(id)) {
         this._initialized = true;
-        log(`переход по хешу к фото #${id}`);
         this.showPhoto(id);
         return;
       }
@@ -206,11 +201,8 @@ class UIManager {
     if (this._currentScreen === 'qr') {
       this._qrScanner.stop();
       this._qrScreen.classList.add('hidden');
-      if (this._screenBeforeQR === 'photo') {
-        this.showPhoto();
-      } else {
-        this.showGallery();
-      }
+      if (this._screenBeforeQR === 'photo') this.showPhoto();
+      else this.showGallery();
     } else if (this._currentScreen === 'photo') {
       this.showGallery();
     }
@@ -275,6 +267,14 @@ class UIManager {
           <input type="text" id="feedback-name" class="feedback-input" placeholder="Ваше имя" required />
           <input type="email" id="feedback-email" class="feedback-input" placeholder="Ваша почта" required />
           <textarea id="feedback-message" class="feedback-textarea" placeholder="Ваше сообщение..." rows="5" required></textarea>
+          <div class="feedback-stars" id="feedback-stars">
+            <span class="star" data-value="1">☆</span>
+            <span class="star" data-value="2">☆</span>
+            <span class="star" data-value="3">☆</span>
+            <span class="star" data-value="4">☆</span>
+            <span class="star" data-value="5">☆</span>
+          </div>
+          <input type="hidden" id="feedback-rating" value="0" />
           <button type="submit" id="feedback-submit" class="feedback-submit-btn">
             <span class="btn-text">Отправить</span>
           </button>
@@ -294,7 +294,22 @@ class UIManager {
     `;
     document.getElementById('app').appendChild(screen);
 
-    document.getElementById('close-feedback-btn').addEventListener('click', () => {
+    // Звёзды рейтинга
+    const stars = screen.querySelectorAll('#feedback-stars .star');
+    const ratingInput = screen.querySelector('#feedback-rating');
+    stars.forEach(star => {
+      star.addEventListener('click', () => {
+        const value = parseInt(star.dataset.value);
+        ratingInput.value = value;
+        stars.forEach((s, i) => {
+          s.textContent = i < value ? '★' : '☆';
+          s.classList.toggle('active', i < value);
+        });
+      });
+    });
+
+    // Кнопка «Назад»
+    screen.querySelector('#close-feedback-btn').addEventListener('click', () => {
       log('закрытие обратной связи');
       screen.classList.add('hidden');
 
@@ -320,7 +335,8 @@ class UIManager {
       }
     });
 
-    document.getElementById('feedback-form').addEventListener('submit', (e) => {
+    // Отправка
+    screen.querySelector('#feedback-form').addEventListener('submit', (e) => {
       e.preventDefault();
       this._sendFeedback();
     });
@@ -343,6 +359,7 @@ class UIManager {
     const nameInput = document.getElementById('feedback-name');
     const emailInput = document.getElementById('feedback-email');
     const messageInput = document.getElementById('feedback-message');
+    const ratingInput = document.getElementById('feedback-rating');
 
     [nameInput, emailInput, messageInput].forEach(el => el.classList.remove('error'));
     errorEl.classList.add('hidden');
@@ -350,6 +367,7 @@ class UIManager {
     const name = nameInput.value.trim();
     const email = emailInput.value.trim();
     const message = messageInput.value.trim();
+    const rating = ratingInput?.value || '0';
 
     let hasError = false;
     if (!name)     { nameInput.classList.add('error');    hasError = true; }
@@ -363,17 +381,15 @@ class UIManager {
 
     this._setSubmitLoading(submitBtn, true);
 
-    // Собираем логи
     let fullMessage = message;
+    if (rating !== '0') {
+      fullMessage += `\nОценка: ${rating}/5`;
+    }
+
     const appLogs = getLogs();
     const cameraLogs = getCameraLogs();
-
-    if (appLogs) {
-      fullMessage += '\n\n--- ЛОГИ ПРИЛОЖЕНИЯ ---\n' + appLogs;
-    }
-    if (cameraLogs) {
-      fullMessage += '\n\n--- ЛОГИ КАМЕРЫ ---\n' + cameraLogs;
-    }
+    if (appLogs) fullMessage += '\n\n--- ЛОГИ ПРИЛОЖЕНИЯ ---\n' + appLogs;
+    if (cameraLogs) fullMessage += '\n\n--- ЛОГИ КАМЕРЫ ---\n' + cameraLogs;
 
     const templateParams = {
       name: name,
@@ -400,7 +416,6 @@ class UIManager {
     btn.disabled = loading;
     const btnText = btn.querySelector('.btn-text');
     const existingSpinner = btn.querySelector('.btn-spinner');
-
     if (loading) {
       if (!existingSpinner) {
         const spinner = document.createElement('div');
@@ -419,7 +434,6 @@ class UIManager {
     const success = document.getElementById('feedback-success');
     const error = document.getElementById('feedback-error');
     const submitBtn = document.getElementById('feedback-submit');
-
     if (form) {
       form.classList.remove('hidden');
       form.reset();
@@ -427,6 +441,11 @@ class UIManager {
     if (success) success.classList.add('hidden');
     if (error) error.classList.add('hidden');
     if (submitBtn) this._setSubmitLoading(submitBtn, false);
+    // Сброс звёзд
+    const stars = document.querySelectorAll('#feedback-stars .star');
+    stars.forEach(s => { s.textContent = '☆'; s.classList.remove('active'); });
+    const ratingInput = document.getElementById('feedback-rating');
+    if (ratingInput) ratingInput.value = '0';
   }
 
   _hideLoading() {
