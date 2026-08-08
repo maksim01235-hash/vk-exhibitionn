@@ -248,6 +248,11 @@ class UIManager {
         this._qrScreen.classList.add('hidden');
         this._setFeedbackBtnShifted(true);
         this._photoView.resetSwipe();
+      } else if (this._screenBeforeFeedback === 'qr') {
+        this._currentScreen = 'qr';
+        this._galleryScreen.classList.add('hidden');
+        this._photoScreen.classList.add('hidden');
+        this._qrScreen.classList.remove('hidden');
       } else {
         this.showGallery();
       }
