@@ -133,7 +133,6 @@ class UIManager {
   }
 
   showQR() {
-    // Скрываем пузырь
     FeedbackPrompt.cancel(true);
 
     this._screenBeforeQR = this._currentScreen;
@@ -141,7 +140,7 @@ class UIManager {
     this._galleryScreen.classList.add('hidden');
     this._photoScreen.classList.add('hidden');
     this._hideFeedbackScreen();
-    this._qrScreen.classList.remove('hidden');
+    this._qrScreen.classList.remove('hidden', 'closing');
     this._qrScanner.start();
     this._photoView.resetSwipe();
     this._setFeedbackBtnShifted(false);
@@ -151,10 +150,21 @@ class UIManager {
     if (this._currentScreen === 'qr') {
       this._qrScanner.stop();
       this._qrScreen.classList.add('hidden');
+      // Явно показываем
       if (this._screenBeforeQR === 'photo') {
-        this.showPhoto();
+        this._currentScreen = 'photo';
+        this._photoScreen.classList.remove('hidden');
+        this._galleryScreen.classList.add('hidden');
+        this._qrScreen.classList.add('hidden');
+        this._setFeedbackBtnShifted(true);
+        this._photoView.resetSwipe();
       } else {
-        this.showGallery();
+        this._galleryScreen.classList.remove('hidden');
+        this._photoScreen.classList.add('hidden');
+        this._qrScreen.classList.add('hidden');
+        this._currentScreen = 'gallery';
+        this._setFeedbackBtnShifted(false);
+        this._galleryView.render();
       }
     } else if (this._currentScreen === 'photo') {
       this.showGallery();
@@ -193,6 +203,31 @@ class UIManager {
 
     this._resetFeedbackForm();
     feedbackScreen.classList.remove('hidden');
+  }
+
+  _animateCloseQR() {
+    const qrScreen = this._qrScreen;
+    
+    // Показываем целевой экран сразу
+    if (this._screenBeforeQR === 'photo') {
+      this._currentScreen = 'photo';
+      this._galleryScreen.classList.add('hidden');
+      this._photoScreen.classList.remove('hidden');
+      this._qrScreen.classList.add('hidden');
+      this._setFeedbackBtnShifted(true);
+    } else {
+      this.showGallery();
+      this._qrScreen.classList.remove('hidden');
+    }
+
+    this._qrScanner.stop();
+
+    // Анимация закрытия поверх
+    qrScreen.classList.add('closing');
+    qrScreen.addEventListener('animationend', () => {
+      qrScreen.classList.add('hidden');
+      qrScreen.classList.remove('closing');
+    }, { once: true });
   }
 
   _createFeedbackScreen() {

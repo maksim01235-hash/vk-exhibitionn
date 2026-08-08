@@ -64,10 +64,8 @@ class QRScanner {
   async start() {
     if (this._isRunning) return;
 
-    // Очищаем контейнер
     this._readerContainer.innerHTML = '';
 
-    // Проверяем, что библиотека загружена
     if (typeof Html5Qrcode === 'undefined') {
       this._readerContainer.innerHTML = MSG_LIB_NOT_LOADED;
       return;
@@ -75,16 +73,34 @@ class QRScanner {
 
     try {
       this._reader = new Html5Qrcode(READER_ID);
+      
+      // Получаем список камер
+      const cameras = await Html5Qrcode.getCameras();
+      
+      let cameraId = { facingMode: CAMERA_FACING };
+      
+      if (cameras && cameras.length > 0) {
+        // Ищем заднюю камеру с самым высоким разрешением (обычно основная)
+        const backCameras = cameras.filter(c => c.id.includes('back') || c.id.includes('rear') || c.id === '0');
+        if (backCameras.length > 0) {
+          // Берём камеру с самым длинным id (обычно основная) или первую
+          const mainCamera = backCameras.reduce((a, b) => 
+            (a.id.length >= b.id.length) ? a : b
+          );
+          cameraId = { deviceId: mainCamera.id };
+        }
+      }
+      
       this._isRunning = true;
 
       await this._reader.start(
-        { facingMode: CAMERA_FACING },
+        cameraId,
         {
           fps: SCAN_FPS,
           qrbox: QRBOX_SIZE,
         },
         (decodedText) => this._onScanSuccess(decodedText),
-        () => {} // Ошибки сканирования в процессе игнорируем
+        () => {}
       );
     } catch (err) {
       console.log('QRScanner: камера недоступна:', err.message);
@@ -119,7 +135,6 @@ class QRScanner {
    * @param {string} decodedText — содержимое QR-кода
    */
   _onScanSuccess(decodedText) {
-    console.log('QRScanner: считан QR:', decodedText);
     this.stop();
 
     // Извлекаем ID фото (делегируем Router)
