@@ -24,39 +24,39 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 /** Статические файлы для предкеширования */
 const STATIC_ASSETS = [
   // HTML
-  '/',
-  '/index.html',
+  './',
+  './index.html',
 
   // CSS
-  '/styles/main.css',
+  './styles/main.css',
 
   // JS — ядро
-  '/src/app.js',
-  '/src/config.js',
+  './src/app.js',
+  './src/config.js',
 
   // JS — core
-  '/src/core/EventBus.js',
-  '/src/core/Store.js',
-  '/src/core/Router.js',
+  './src/core/EventBus.js',
+  './src/core/Store.js',
+  './src/core/Router.js',
 
   // JS — data
-  '/src/data/DataLayer.js',
+  './src/data/DataLayer.js',
 
   // JS — ui
-  '/src/ui/UIManager.js',
-  '/src/ui/GalleryView.js',
-  '/src/ui/PhotoView.js',
-  '/src/ui/InfoPanel.js',
-  '/src/ui/SwipeManager.js',
-  '/src/ui/QRScanner.js',
+  './src/ui/UIManager.js',
+  './src/ui/GalleryView.js',
+  './src/ui/PhotoView.js',
+  './src/ui/InfoPanel.js',
+  './src/ui/SwipeManager.js',
+  './src/ui/QRScanner.js',
 
   // JS — utils
-  '/src/utils/markdown.js',
-  '/src/utils/ImagePreloader.js',
-  '/src/utils/FeedbackPrompt.js',
+  './src/utils/markdown.js',
+  './src/utils/ImagePreloader.js',
+  './src/utils/FeedbackPrompt.js',
 
   // Статика
-  '/assets/placeholder.jpg',
+  './assets/placeholder.jpg',
 
   // CDN-зависимости
   'https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js',
