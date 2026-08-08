@@ -132,6 +132,9 @@ class UIManager {
   }
 
   showQR() {
+    // Скрываем пузырь
+    FeedbackPrompt.cancel(true);
+
     this._screenBeforeQR = this._currentScreen;
     this._currentScreen = 'qr';
     this._galleryScreen.classList.add('hidden');
