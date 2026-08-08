@@ -157,10 +157,6 @@ class UIManager {
     if (this._currentScreen === 'qr') {
       this._qrScanner.stop();
       this._qrScreen.classList.add('hidden');
-      // Очищаем контейнер камеры
-      const qrContainer = document.getElementById('qr-reader');
-      if (qrContainer) qrContainer.innerHTML = '';
-      
       if (this._screenBeforeQR === 'photo') this.showPhoto();
       else this.showGallery();
     } else if (this._currentScreen === 'photo') {

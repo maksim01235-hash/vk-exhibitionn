@@ -228,6 +228,29 @@ class QRScanner {
       EventBus.emit('router:openGallery');
     }
   }
+
+  stop() {
+    if (!this._isRunning) return;
+    log('остановка');
+    cameraLogToBuffer('остановка');
+    
+    if (this._readerContainer) {
+      this._readerContainer.innerHTML = '';
+    }
+    
+    if (this._reader) {
+      try {
+        this._reader.stop()
+          .then(() => { this._isRunning = false; })
+          .catch(() => { this._isRunning = false; });
+      } catch (e) {
+        log(`ошибка остановки: ${e.message}`, 'warn');
+        this._isRunning = false;
+      }
+    } else {
+      this._isRunning = false;
+    }
+  }
 }
 
 export default QRScanner;

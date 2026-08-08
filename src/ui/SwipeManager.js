@@ -24,7 +24,7 @@ import { createLogger } from '../utils/Logger.js';
 const DEBUG = false; // Частые события, лучше отключить
 
 /** Порог свайпа по умолчанию (px) */
-const DEFAULT_THRESHOLD = 90;
+const DEFAULT_THRESHOLD = 80;
 
 /** Минимальное смещение для определения направления (px) */
 const DIRECTION_DETECT_OFFSET = 10;

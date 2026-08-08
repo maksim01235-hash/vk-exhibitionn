@@ -38,7 +38,7 @@ const FADE_DURATION = 400;
 // ── Свайп ─────────────────────────────
 
 /** Порог свайпа (px) — минимальное расстояние для смены слайда */
-const SWIPE_THRESHOLD = 90;
+const SWIPE_THRESHOLD = 80;
 
 /** Множитель следования трека за пальцем (1.0 = 1:1) */
 const SWIPE_FOLLOW_RATIO = 1.0;
