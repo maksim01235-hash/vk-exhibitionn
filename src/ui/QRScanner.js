@@ -80,20 +80,17 @@ class QRScanner {
   // ПУБЛИЧНЫЙ API
   // ═══════════════════════════════════════
 
-  async start() {
-    if (this._isRunning) {
-      log('уже запущен');
-      return;
-    }
-
-    // Сначала полностью останавливаем предыдущий сканер
+   async start() {
+    if (this._isRunning) return;
+    
+    // Полный сброс предыдущего
     if (this._reader) {
       try { await this._reader.stop(); } catch (e) {}
       this._reader = null;
     }
     this._isRunning = false;
-    this._readerContainer.innerHTML = '';
-
+    if (this._readerContainer) this._readerContainer.innerHTML = '';
+    
     log('запуск...');
     log(`userAgent: ${navigator.userAgent.substring(0, 80)}`);
 
@@ -234,21 +231,16 @@ class QRScanner {
     log('остановка');
     cameraLogToBuffer('остановка');
     
+    this._isRunning = false; // Сразу сбрасываем флаг
+    
     if (this._readerContainer) {
       this._readerContainer.innerHTML = '';
     }
     
     if (this._reader) {
-      try {
-        this._reader.stop()
-          .then(() => { this._isRunning = false; })
-          .catch(() => { this._isRunning = false; });
-      } catch (e) {
-        log(`ошибка остановки: ${e.message}`, 'warn');
-        this._isRunning = false;
-      }
-    } else {
-      this._isRunning = false;
+      const reader = this._reader;
+      this._reader = null; // Обнуляем сразу
+      reader.stop().catch(() => {}); // Молча глотаем ошибку
     }
   }
 }

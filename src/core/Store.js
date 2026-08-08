@@ -112,8 +112,9 @@ class Store {
     if (this._photos.length === 0) return null;
     this._currentIndex = (this._currentIndex + 1) % this._photos.length;
     const photo = this.getCurrentPhoto();
-    log(`следующее фото #${photo?.id} (индекс ${this._currentIndex})`);
-    EventBus.emit('photo:changed', photo);
+    if (EventBus.hasListeners('photo:changed')) {
+      EventBus.emit('photo:changed', photo);
+    }
     return photo;
   }
 
