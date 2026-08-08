@@ -42,33 +42,42 @@ class QRScanner {
 
     try {
       this._reader = new Html5Qrcode(READER_ID);
-      this._cameras = await Html5Qrcode.getCameras();
+      const allCameras = await Html5Qrcode.getCameras();
 
-      if (this._cameras.length === 0) {
+      if (allCameras.length === 0) {
         this._readerContainer.innerHTML = MSG_CAMERA_ERROR;
         return;
       }
 
-      // Показываем кнопку переключения если камер больше одной
+      // Сохраняем все камеры
+      this._cameras = allCameras;
+
+      // Ищем заднюю камеру (back, rear, environment, или id = '0')
+      let backIndex = this._cameras.findIndex(c => 
+        c.id.toLowerCase().includes('back') || 
+        c.id.toLowerCase().includes('rear') ||
+        c.id === '0'
+      );
+      
+      // Если не нашли — берём первую
+      if (backIndex === -1) backIndex = 0;
+      
+      this._currentCameraIndex = backIndex;
+
+      // Показываем кнопку если камер > 1
       const switchBtn = document.getElementById('switch-camera-btn');
       if (switchBtn) {
-        if (this._cameras.length > 1) {
-          switchBtn.classList.remove('hidden');
-          switchBtn.onclick = () => this._switchCamera();
-        } else {
-          switchBtn.classList.add('hidden');
-        }
+        switchBtn.classList.toggle('hidden', this._cameras.length <= 1);
+        switchBtn.onclick = () => this._switchCamera();
       }
 
-      this._currentCameraIndex = 0;
-      await this._startCamera(this._cameras[0].id);
+      await this._startCamera(this._cameras[this._currentCameraIndex].id);
     } catch (err) {
       console.log('QRScanner: камера недоступна:', err.message);
       this._isRunning = false;
       this._readerContainer.innerHTML = MSG_CAMERA_ERROR;
     }
   }
-
   async _startCamera(cameraId) {
     if (this._isRunning) {
       await this._reader.stop();
@@ -92,11 +101,14 @@ class QRScanner {
 
     this._currentCameraIndex = (this._currentCameraIndex + 1) % this._cameras.length;
     const cameraId = this._cameras[this._currentCameraIndex].id;
+    console.log('QRScanner: переключаю на камеру', this._currentCameraIndex, cameraId);
 
     try {
       await this._startCamera(cameraId);
     } catch (err) {
       console.log('QRScanner: не удалось переключить камеру:', err.message);
+      // Возвращаемся на предыдущую
+      this._currentCameraIndex = (this._currentCameraIndex - 1 + this._cameras.length) % this._cameras.length;
     }
   }
 
