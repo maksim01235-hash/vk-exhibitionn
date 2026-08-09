@@ -230,9 +230,28 @@ class QRScanner {
     if (id) {
       EventBus.emit('router:openPhoto', id);
     } else {
-      alert(`QR-код считан, но ID фотографии не найден.\nСодержимое: ${decodedText}`);
-      EventBus.emit('router:openGallery');
+      this._showToast('QR-код не распознан как ссылка на фотографию');
     }
+  }
+
+    _showToast(message) {
+    // Удаляем старый тост если есть
+    const existing = document.querySelector('.qr-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'qr-toast';
+    toast.textContent = message;
+    document.getElementById('app').appendChild(toast);
+
+    // Анимация появления
+    requestAnimationFrame(() => toast.classList.add('visible'));
+
+    // Автоскрытие
+    setTimeout(() => {
+      toast.classList.remove('visible');
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
   }
 
   stop() {
