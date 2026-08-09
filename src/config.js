@@ -42,7 +42,7 @@ const EXHIBITION = {
    * Название выставки.
    * Отображается в тулбаре галереи и в теге <title>.
    */
-  NAME: 'Выставка',
+  NAME: 'Увидеть невидимое',
 
   /**
    * ID приложения ВКонтакте.
@@ -100,7 +100,7 @@ SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwHJ2dg6pFCrOGU6VwwBC6zLlPc
 const TECH = {
   CACHE_TTL: 30,
   PHOTOS_PER_PAGE: 50,
-  SW_CACHE_VERSION: 'v13',
+  SW_CACHE_VERSION: 'v14',
 };
 
 // ═══════════════════════════════════════

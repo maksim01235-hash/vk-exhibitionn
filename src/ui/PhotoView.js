@@ -188,8 +188,19 @@ class PhotoView {
     if (!this._swipeManager) this._setupSwipeManager();
 
     // Трек в центр
+    // 10. Телепорт трека в центр
     this._resetTrackToCenter();
 
+    // Сбрасываем скролл центрального слайда
+    const centerSlide = document.querySelector('.slide-center');
+    if (centerSlide) {
+      centerSlide.scrollTop = 0;
+    }
+
+    // 11. Текст выезжает из-под фото
+    if (!direction) {
+      requestAnimationFrame(() => this._revealCenterText());
+    }
     // Текст + фэйд
     if (!direction) {
       requestAnimationFrame(() => this._revealCenterText());

@@ -228,7 +228,8 @@ class UIManager {
             <polyline points="22 4 12 14.01 9 11.01"/>
           </svg>
           <p>Сообщение отправлено!</p>
-          <p style="font-size:14px;color:var(--text-muted)">Мы ответим вам в ближайшее время</p>
+          <p style="font-size:14px;color:var(--text-muted)">Спасибо за ответ!
+Мы очень ценим ваше участие.</p>
         </div>
         <div id="feedback-error" class="feedback-error hidden">
           <p>Ошибка при отправке. Попробуйте позже.</p>

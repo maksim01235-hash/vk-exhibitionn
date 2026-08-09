@@ -81,7 +81,6 @@ class QRScanner {
     /** @type {Array|null} Кешированный список камер */
     this._cachedCameras = null;
         log(`создан, _lastCameraId=${this._lastCameraId}, _cachedCameras=${this._cachedCameras}`);
-    log('создан');
   }
 
   // ═══════════════════════════════════════
