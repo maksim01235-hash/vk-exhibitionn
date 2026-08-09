@@ -25,7 +25,7 @@ import { createLogger } from '../utils/Logger.js';
 // ═══════════════════════════════════════
 
 /** Включить логирование */
-const DEBUG = true;
+const DEBUG = false;
 
 // ── Изображение ───────────────────────
 

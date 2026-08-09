@@ -32,7 +32,7 @@ import { createLogger } from '../utils/Logger.js';
 const SCAN_RETRY_DELAY = 2000;
 
 /** Включить логирование */
-const DEBUG = true;
+const DEBUG = false;
 
 /** Частота сканирования (кадров/сек) */
 const SCAN_FPS = 10;

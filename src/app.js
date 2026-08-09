@@ -28,14 +28,14 @@ import { getLogs } from './utils/Logger.js';
  * true — логировать все этапы инициализации и ошибки.
  * false — только критические ошибки.
  */
-const DEBUG = true;
+const DEBUG = false;
 
 /**
  * Версия приложения.
  * Менять при каждом деплое для сброса кеша Service Worker.
  * Формат: MAJOR.MINOR.PATCH
  */
-const APP_VERSION = '2.5.4';
+const APP_VERSION = '2.5.6';
 
 /** Путь к Service Worker */
 const SW_PATH = './sw.js';

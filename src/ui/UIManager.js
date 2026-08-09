@@ -11,7 +11,7 @@ import FeedbackPrompt from '../utils/FeedbackPrompt.js';
 import CONFIG from '../config.js';
 import { createLogger, getLogs } from '../utils/Logger.js';
 
-const DEBUG = true;
+const DEBUG = false;
 
 const SCREENS = {
   gallery:  'gallery-screen',

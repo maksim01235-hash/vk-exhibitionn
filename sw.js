@@ -22,10 +22,10 @@
 // ═══════════════════════════════════════
 
 /** Включить подробное логирование */
-const DEBUG = true;
+const DEBUG = false;
 
 /** Версия кеша — менять при обновлении статики */
-const CACHE_NAME = 'vk-exhibition-v15';
+const CACHE_NAME = 'vk-exhibition-v17';
 
 /** Максимальный размер кешируемого изображения (10 MB) */
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
