@@ -25,7 +25,7 @@
 const DEBUG = true;
 
 /** Версия кеша — менять при обновлении статики */
-const CACHE_NAME = 'vk-exhibition-v14';
+const CACHE_NAME = 'vk-exhibition-v15';
 
 /** Максимальный размер кешируемого изображения (10 MB) */
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
