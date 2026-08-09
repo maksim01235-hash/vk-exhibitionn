@@ -28,6 +28,8 @@ import { createLogger } from '../utils/Logger.js';
 // ═══════════════════════════════════════
 // КОНСТАНТЫ
 // ═══════════════════════════════════════
+/** Задержка перезапуска сканера после неудачного распознавания (мс) */
+const SCAN_RETRY_DELAY = 2000;
 
 /** Включить логирование */
 const DEBUG = true;
@@ -231,6 +233,7 @@ class QRScanner {
       EventBus.emit('router:openPhoto', id);
     } else {
       this._showToast('QR-код не распознан как ссылка на фотографию');
+      setTimeout(() => this.start(), SCAN_RETRY_DELAY);
     }
   }
 
