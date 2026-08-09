@@ -54,7 +54,7 @@ const OBSERVER_OPTIONS = {
 };
 
 /** Заглушка если нет ни preview, ни full */
-const PLACEHOLDER_URL = 'assets/placeholder.jpg';
+const PLACEHOLDER_URL = 'assets/placeholder.webp';
 
 // ═══════════════════════════════════════
 // ЛОГГЕР
