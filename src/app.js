@@ -35,7 +35,7 @@ const DEBUG = false;
  * Менять при каждом деплое для сброса кеша Service Worker.
  * Формат: MAJOR.MINOR.PATCH
  */
-const APP_VERSION = '2.5.6';
+const APP_VERSION = '2.5.7';
 
 /** Путь к Service Worker */
 const SW_PATH = './sw.js';
